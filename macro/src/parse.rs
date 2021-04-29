@@ -6,7 +6,7 @@ use syn::{
     spanned::Spanned,
 };
 
-use crate::ast::{Expr, Input, Node};
+use crate::ast::{Expr, Input, Leaf, Node, NodeKind, Obj};
 
 
 
@@ -14,6 +14,8 @@ impl Parse for Input {
     fn parse(input: ParseStream) -> Result<Self, syn::Error> {
         let mut outer_attrs = input.call(syn::Attribute::parse_inner)?;
         let doc = extract_doc(&mut outer_attrs)?;
+        let visibility = extract_visibility(&mut outer_attrs)?;
+        let typename = extract_typename(&mut outer_attrs)?;
 
         // Extract attributes that we will just forward/emit verbatim. Well, not
         // completely verbatim: we have to change the type to outer attribute.
@@ -22,19 +24,18 @@ impl Parse for Input {
             a.style = syn::AttrStyle::Outer;
         }
 
-        // `#![visibility = "..."]`
-        let visibility = extract_single_name_value_attr("visibility", &mut outer_attrs)?
-            .map(|v| Ok::<_, syn::Error>(assert_string_lit(v)?.parse::<TokenStream>()?))
-            .transpose()?;
 
         assert_no_extra_attrs(&outer_attrs)?;
         let children = input.call(<Punctuated<_, syn::Token![,]>>::parse_terminated)?;
 
-        let root = Node::Internal {
+        let root = Node {
             doc,
             attrs: forwarded_attrs,
             name: Ident::new("config", Span::call_site()),
-            children: children.into_iter().collect(),
+            kind: NodeKind::Obj(Obj {
+                typename,
+                children: children.into_iter().collect(),
+            }),
         };
 
         Ok(Self { root, visibility })
@@ -53,17 +54,21 @@ impl Parse for Node {
 
         let out = if input.lookahead1().peek(syn::token::Brace) {
             // --- A nested Internal ---
+            let typename = extract_typename(&mut attrs)?;
             let forwarded_attrs = extract_attrs(&["derive"], &mut attrs);
 
             let inner;
             syn::braced!(inner in input);
             let fields = inner.call(<Punctuated<_, syn::Token![,]>>::parse_terminated)?;
 
-            Self::Internal {
+            Self {
                 doc,
                 attrs: forwarded_attrs,
                 name,
-                children: fields.into_iter().collect(),
+                kind: NodeKind::Obj(Obj {
+                    typename,
+                    children: fields.into_iter().collect(),
+                }),
             }
         } else {
             // --- A single value ---
@@ -93,7 +98,12 @@ impl Parse for Node {
                 return Err(Error::new(name.span(), msg));
             }
 
-            Self::Leaf { doc, name, ty, default, example }
+            Self {
+                doc,
+                attrs: vec![],
+                name,
+                kind: NodeKind::Leaf(Leaf {  ty, default, example }),
+            }
         };
 
         assert_no_extra_attrs(&attrs)?;
@@ -201,4 +211,22 @@ fn assert_string_lit(lit: syn::Lit) -> Result<String, Error> {
         syn::Lit::Str(s) => Ok(s.value()),
         _ => Err(Error::new(lit.span(), "expected string literal")),
     }
+}
+
+/// `#[visibility = "..."]`
+fn extract_visibility(attrs: &mut Vec<syn::Attribute>) -> Result<Option<TokenStream>, Error> {
+    extract_single_name_value_attr("visibility", attrs)?
+        .map(|v| Ok::<_, syn::Error>(assert_string_lit(v)?.parse::<TokenStream>()?))
+        .transpose()
+}
+
+/// `#[typename = "..."]`
+fn extract_typename(attrs: &mut Vec<syn::Attribute>) -> Result<Option<Ident>, Error> {
+    extract_single_name_value_attr("typename", attrs)?
+        .map(|lit| {
+            let span = lit.span();
+            let s = assert_string_lit(lit)?;
+            Ok(Ident::new(&s, span))
+        })
+        .transpose()
 }

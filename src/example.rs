@@ -28,6 +28,8 @@ crate::config! {
         /// How often to reattempt reaching the DNS server.
         retry_attempts: u32 = 27,
     },
+
+    #[typename = "Logger"]
     log: {
         /// Sets the log level. Possible values: "trace", "debug", "info",
         /// "warn", "error" and "off".

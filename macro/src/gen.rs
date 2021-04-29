@@ -3,101 +3,238 @@ use quote::{quote, ToTokens};
 use syn::Ident;
 use std::fmt::{self, Write};
 
-use crate::ast::{Expr, Input, Node};
+use crate::ast::{Expr, Input, Leaf, Node, NodeKind, Obj};
 
 
 pub(crate) fn gen(input: Input) -> TokenStream {
     let visibility = input.visibility.clone().unwrap_or(quote! { pub(crate) });
     let toml = gen_toml(&input);
-    let root_mod = gen_root_mod(&input, &visibility);
-    let raw_mod = gen_raw_mod(&input, &visibility);
+    let types = gen_types(&input, &visibility);
 
     quote! {
         #visibility const TOML_TEMPLATE: &str = #toml;
 
-        #root_mod
-        #raw_mod
+        #types
     }
 }
 
-fn gen_raw_mod(input: &Input, visibility: &TokenStream) -> TokenStream {
-    let mut contents = TokenStream::new();
+/// Generates the struct fields for both, the raw struct and the main struct.
+fn gen_struct_fields(children: &[Node], visibility: &TokenStream) -> (TokenStream, TokenStream) {
+    let mut raw_fields = TokenStream::new();
+    let mut main_fields = TokenStream::new();
+
+    for child in children {
+        let name = &child.name;
+        let doc = &child.doc;
+
+        match &child.kind {
+            NodeKind::Obj(_) => {
+                let child_typename = child.typename().unwrap();
+                let default_path = format!("{}::empty", child_typename);
+                raw_fields.extend(quote! {
+                    #[serde(default = #default_path)]
+                    #visibility #name: #child_typename,
+                });
+                main_fields.extend(quote! {
+                    #visibility #name: #child_typename,
+                });
+            }
+            NodeKind::Leaf(Leaf { ty, .. }) => {
+                let inner = as_option(&ty).unwrap_or(&ty);
+                raw_fields.extend(quote! {
+                    #visibility #name: Option<#inner>,
+                });
+                main_fields.extend(quote! {
+                    #( #[doc = #doc] )*
+                    #visibility #name: #ty,
+                });
+            }
+        }
+    }
+
+    (raw_fields, main_fields)
+}
+
+/// Generates the definition for `default_values`, a function associated with raw types.
+fn gen_raw_default_constructor(
+    children: &[Node],
+    path: &[String],
+    visibility: &TokenStream,
+) -> TokenStream {
+    let fields = collect_tokens(children, |node| {
+        let name = &node.name;
+        match &node.kind {
+            NodeKind::Leaf(Leaf { default: None, .. }) => quote! { #name: None, },
+            NodeKind::Leaf(Leaf { default: Some(expr), ty, .. }) => {
+                // TODO: we can specialize this for certain types such that we
+                // don't have to invoke serde.
+                let inner_type = as_option(ty).unwrap_or(ty);
+                let path = append_path(path, name);
+                let msg = format!(
+                    "default configuration value for '{}' cannot be deserialized as '{}'",
+                    path,
+                    inner_type.to_token_stream(),
+                );
+
+                quote! {
+                    #name: Some({
+                        let result: Result<_, confique::serde::de::value::Error>
+                            = Deserialize::deserialize(#expr.into_deserializer());
+                        result.expect(#msg)
+                    }),
+                }
+            },
+            NodeKind::Obj(_) => {
+                let child_typename = node.typename().unwrap();
+                quote! {
+                    #name: #child_typename::default_values(),
+                }
+            }
+        }
+    });
+
+    quote! {
+        /// Returns an instance of `Self` that contains the specified default
+        /// configuration values. All fields that don't have a default value
+        /// specified are `None`.
+        #visibility fn default_values() -> Self {
+            Self { #fields }
+        }
+    }
+}
+
+/// Generates the definition for `empty`, a function associated with raw types.
+fn gen_raw_empty_constructor(children: &[Node], visibility: &TokenStream) -> TokenStream {
+    let fields = collect_tokens(children, |node| {
+        let name = &node.name;
+        match &node.kind {
+            NodeKind::Leaf(_) => quote! { #name: None, },
+            NodeKind::Obj(_) => {
+                let child_typename = node.typename().unwrap();
+                quote! {
+                    #name: #child_typename::empty(),
+                }
+            }
+        }
+    });
+
+    quote! {
+        /// Returns an instance of `Self` where all values are `None`.
+        #visibility fn empty() -> Self {
+            Self { #fields }
+        }
+    }
+}
+
+/// Generates the definition of the `overwrite_with` method on raw types.
+fn gen_raw_overwrite_with_method(children: &[Node], visibility: &TokenStream) -> TokenStream {
+    let fields = collect_tokens(children, |Node { name, kind, .. }| {
+        match kind {
+            NodeKind::Leaf(_) => quote! { #name: other.#name.or(self.#name), },
+            NodeKind::Obj(_) => quote! { #name: self.#name.overwrite_with(other.#name), },
+        }
+    });
+
+    quote! {
+        // TODO: Find better name
+        #visibility fn overwrite_with(self, other: Self) -> Self {
+            Self { #fields }
+        }
+    }
+}
+
+/// Generates the impl to convert from a raw type to a main type.
+fn gen_try_from_impl(typename: &Ident, children: &[Node], path: &[String]) -> TokenStream {
+    let fields = collect_tokens(children, |Node { name, kind, .. }| {
+        match kind {
+            NodeKind::Leaf(Leaf { ty, .. }) => {
+                if as_option(ty).is_some() {
+                    // If this value is optional, we just move it as it can never fail.
+                    quote! { #name: src.#name, }
+                } else {
+                    // Otherwise, we return an error if the value hasn't been specified.
+                    let path = append_path(path, name);
+
+                    quote! {
+                        #name: src.#name.ok_or(confique::TryFromError { path: #path })?,
+                    }
+                }
+            },
+            NodeKind::Obj(_) => quote! {
+                #name: std::convert::TryFrom::try_from(src.#name)?,
+            },
+        }
+    });
+
+    quote! {
+        impl std::convert::TryFrom<raw::#typename> for #typename {
+            type Error = confique::TryFromError;
+            fn try_from(src: raw::#typename) -> Result<Self, Self::Error> {
+                Ok(Self {
+                    #fields
+                })
+            }
+        }
+    }
+}
+
+fn append_path(path: &[String], name: &Ident) -> String {
+    if path.is_empty() {
+        name.to_string()
+    } else {
+        format!("{}.{}", path.join("."), name)
+    }
+}
+
+fn gen_types(input: &Input, visibility: &TokenStream) -> TokenStream {
+    let mut raw_types = TokenStream::new();
+    let mut main_types = TokenStream::new();
+
     visit(input, |node, path| {
-        if let Node::Internal { name, children, .. } = node {
-            let type_name = to_camel_case(name);
+        if let NodeKind::Obj(Obj { children, .. }) = &node.kind {
+            let typename = node.typename().unwrap();
 
-            let raw_fields = collect_tokens(children, |node| {
-                match node {
-                    Node::Leaf { name, ty, .. } => {
-                        let inner = as_option(&ty).unwrap_or(&ty);
-                        quote! { #visibility #name: Option<#inner>, }
-                    },
-                    Node::Internal { name, .. } => {
-                        let child_type_name = to_camel_case(name);
-                        quote! {
-                            #[serde(default)]
-                            #visibility #name: #child_type_name,
-                        }
-                    },
-                }
-            });
+            let (raw_fields, main_fields) = gen_struct_fields(&children, visibility);
+            let raw_default_constructor = gen_raw_default_constructor(&children, path, visibility);
+            let raw_empty_constructor = gen_raw_empty_constructor(&children, visibility);
+            let overwrite_with_method = gen_raw_overwrite_with_method(&children, visibility);
+            let try_from_impl = gen_try_from_impl(&typename, &children, path);
 
-            let default_fields = collect_tokens(children, |node| {
-                match node {
-                    Node::Leaf { name, default: None, .. } => quote! { #name: None, },
-                    Node::Leaf { name, default: Some(expr), ty, .. } => {
-                        let inner_type = as_option(ty).unwrap_or(ty);
-                        let path = format!("{}.{}", path.join("."), name);
-                        let msg = format!(
-                            "default configuration value for '{}' cannot be deserialized as '{}'",
-                            path,
-                            inner_type.to_token_stream(),
-                        );
-
-                        quote! {
-                            #name: Some({
-                                let result: Result<_, confique::serde::de::value::Error>
-                                    = Deserialize::deserialize(#expr.into_deserializer());
-                                result.expect(#msg)
-                            }),
-                        }
-                    },
-                    Node::Internal { name, .. } => {
-                        let child_type_name = to_camel_case(name);
-                        quote! {
-                            #name: #child_type_name::default_values(),
-                        }
-                    }
-                }
-            });
-
-            let overwrite_with_fields = collect_tokens(children, |node| {
-                match node {
-                    Node::Leaf { name, .. } => quote! {
-                        #name: other.#name.or(self.#name),
-                    },
-                    Node::Internal { name, .. } => quote! {
-                        #name: self.#name.overwrite_with(other.#name),
-                    }
-                }
-            });
-
-            contents.extend(quote! {
-                #[derive(Debug, Default, confique::serde::Deserialize)]
-                #[serde(deny_unknown_fields)]
-                #visibility struct #type_name {
+            // Raw type definition
+            raw_types.extend(quote! {
+                #[derive(Debug, Deserialize)]
+                #visibility struct #typename {
                     #raw_fields
                 }
 
-                impl #type_name {
-                    #visibility fn default_values() -> Self {
-                        Self { #default_fields }
-                    }
-
-                    #visibility fn overwrite_with(self, other: Self) -> Self {
-                        Self { #overwrite_with_fields }
-                    }
+                impl #typename {
+                    #raw_default_constructor
+                    #raw_empty_constructor
+                    #overwrite_with_method
                 }
+            });
+
+            // Main type definition
+            let doc = &node.doc;
+            let attrs = &node.attrs;
+
+            // We add some derives if the user has not specified any
+            let derive = if attrs.iter().any(|attr| attr.path.is_ident("derive")) {
+                quote! {}
+            } else {
+                quote! { #[derive(Debug)] }
+            };
+
+            main_types.extend(quote! {
+                #( #[doc = #doc] )*
+                #( #attrs )*
+                #derive
+
+                #visibility struct #typename {
+                    #main_fields
+                }
+
+                #try_from_impl
             });
         }
     });
@@ -110,94 +247,24 @@ fn gen_raw_mod(input: &Input, visibility: &TokenStream) -> TokenStream {
         /// "layers" of configuration sources. Imagine that the three layers:
         /// environment variables, a TOML file and the fixed default values. The
         /// only thing that matters is that required values are present after
-        /// merging all sources, but each individual source can be missing
-        /// required values.
+        /// merging all sources, but each individual is allowed to lack required
+        /// values.
         ///
-        /// These types implement `serde::Deserialize`.
+        /// These types implement `serde::Deserialize` and `Debug`.
         #visibility mod raw {
+            // We have to add this blanket use to be able to refer to all the
+            // types the user referred to.
             use super::*;
+
             use confique::serde::{Deserialize, de::IntoDeserializer};
 
-            #contents
+            #raw_types
         }
+
+        #main_types
     }
 }
 
-fn gen_root_mod(input: &Input, visibility: &TokenStream) -> TokenStream {
-    let mut out = TokenStream::new();
-    visit(input, |node, path| {
-        if let Node::Internal { name, doc, attrs, children } = node {
-            let type_name = to_camel_case(name);
-
-            let user_fields = collect_tokens(children, |node| {
-                match node {
-                    Node::Leaf { name, doc, ty, .. } => quote! {
-                        #( #[doc = #doc] )*
-                        #visibility #name: #ty,
-                    },
-                    Node::Internal { name, .. } => {
-                        let child_type_name = to_camel_case(name);
-                        quote! {
-                            #visibility #name: #child_type_name,
-                        }
-                    },
-                }
-            });
-
-            let try_from_fields = collect_tokens(children, |node| {
-                match node {
-                    Node::Leaf { name, ty, .. } => {
-                        if as_option(ty).is_some() {
-                            // If this value is optional, we just move it as it can never fail.
-                            quote! { #name: src.#name, }
-                        } else {
-                            // Otherwise, we return an error if the value hasn't been specified.
-                            let path = match path.is_empty() {
-                                true => name.to_string(),
-                                false => format!("{}.{}", path.join("."), name),
-                            };
-
-                            quote! {
-                                #name: src.#name.ok_or(confique::TryFromError { path: #path })?,
-                            }
-                        }
-                    },
-                    Node::Internal { name, .. } => quote! {
-                        #name: std::convert::TryFrom::try_from(src.#name)?,
-                    },
-                }
-            });
-
-            // We add some derives if the user has not specified any
-            let derive = if attrs.iter().any(|attr| attr.path.is_ident("derive")) {
-                quote! {}
-            } else {
-                quote! { #[derive(Debug)] }
-            };
-
-            out.extend(quote! {
-                #( #[doc = #doc] )*
-                #( #attrs )*
-                #derive
-
-                #visibility struct #type_name {
-                    #user_fields
-                }
-
-                impl std::convert::TryFrom<raw::#type_name> for #type_name {
-                    type Error = confique::TryFromError;
-                    fn try_from(src: raw::#type_name) -> Result<Self, Self::Error> {
-                        Ok(Self {
-                            #try_from_fields
-                        })
-                    }
-                }
-            });
-        }
-    });
-
-    out
-}
 
 /// Generates the TOML template file.
 fn gen_toml(input: &Input) -> String {
@@ -220,9 +287,9 @@ fn gen_toml(input: &Input) -> String {
 
 
     let mut out = String::new();
-    visit(input, |node, path| {
-        match node {
-            Node::Internal { doc, .. } => {
+    visit(input, |Node { name, doc, kind, .. }, path| {
+        match kind {
+            NodeKind::Obj(_) => {
                 write_doc(&mut out, doc);
 
                 // If a new subsection starts, we always print the header, even if not
@@ -234,7 +301,7 @@ fn gen_toml(input: &Input) -> String {
                 }
             }
 
-            Node::Leaf { doc, name, ty, default, example } => {
+            NodeKind::Leaf(Leaf { ty, default, example }) => {
                 write_doc(&mut out, doc);
 
                 // Add note about default value or the value being required.
@@ -284,10 +351,10 @@ where
     while let Some((node, path)) = stack.pop() {
         visitor(&node, &path);
 
-        if let Node::Internal { children, .. } = node {
+        if let NodeKind::Obj(Obj { children, .. }) = &node.kind {
             for child in children.iter().rev() {
                 let mut child_path = path.clone();
-                child_path.push(child.name().to_string());
+                child_path.push(child.name.to_string());
                 stack.push((child, child_path));
             }
         }
@@ -301,12 +368,6 @@ fn collect_tokens<T>(
     f: impl FnMut(T) -> TokenStream,
 ) -> TokenStream {
     it.into_iter().map(f).collect()
-}
-
-fn to_camel_case(ident: &Ident) -> Ident {
-    use heck::CamelCase;
-
-    Ident::new(&ident.to_string().to_camel_case(), ident.span())
 }
 
 /// Checks if the given type is an `Option` and if so, return the inner type.
