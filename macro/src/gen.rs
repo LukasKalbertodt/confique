@@ -126,7 +126,7 @@ fn gen_raw_mod(input: &Input, visibility: &TokenStream) -> TokenStream {
 fn gen_root_mod(input: &Input, visibility: &TokenStream) -> TokenStream {
     let mut out = TokenStream::new();
     visit(input, |node, path| {
-        if let Node::Internal { name, doc, children } = node {
+        if let Node::Internal { name, doc, attrs, children } = node {
             let type_name = to_camel_case(name);
 
             let user_fields = collect_tokens(children, |node| {
@@ -168,9 +168,18 @@ fn gen_root_mod(input: &Input, visibility: &TokenStream) -> TokenStream {
                 }
             });
 
+            // We add some derives if the user has not specified any
+            let derive = if attrs.iter().any(|attr| attr.path.is_ident("derive")) {
+                quote! {}
+            } else {
+                quote! { #[derive(Debug)] }
+            };
+
             out.extend(quote! {
                 #( #[doc = #doc] )*
-                #[derive(Debug)]
+                #( #attrs )*
+                #derive
+
                 #visibility struct #type_name {
                     #user_fields
                 }

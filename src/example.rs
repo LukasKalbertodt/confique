@@ -14,7 +14,9 @@ use crate as confique;
 crate::config! {
     //! An example configuration.
     #![visibility = "pub"]
+    #![derive(Clone)]
 
+    #[derive(Clone, Copy)]
     dns: {
         /// The DNS server IP address.
         #[example = "1.1.1.1"]

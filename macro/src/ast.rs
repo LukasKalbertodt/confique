@@ -15,6 +15,8 @@ pub(crate) struct Input {
 pub(crate) enum Node {
     Internal {
         doc: Vec<String>,
+        /// Attributes that are used as specified and not interpreted by us.
+        attrs: Vec<syn::Attribute>,
         name: syn::Ident,
         children: Vec<Node>,
     },

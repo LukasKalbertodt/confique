@@ -15,6 +15,13 @@ impl Parse for Input {
         let mut outer_attrs = input.call(syn::Attribute::parse_inner)?;
         let doc = extract_doc(&mut outer_attrs)?;
 
+        // Extract attributes that we will just forward/emit verbatim. Well, not
+        // completely verbatim: we have to change the type to outer attribute.
+        let mut forwarded_attrs = extract_attrs(&["derive"], &mut outer_attrs);
+        for a in &mut forwarded_attrs {
+            a.style = syn::AttrStyle::Outer;
+        }
+
         // `#![visibility = "..."]`
         let visibility = extract_single_name_value_attr("visibility", &mut outer_attrs)?
             .map(|v| Ok::<_, syn::Error>(assert_string_lit(v)?.parse::<TokenStream>()?))
@@ -25,6 +32,7 @@ impl Parse for Input {
 
         let root = Node::Internal {
             doc,
+            attrs: forwarded_attrs,
             name: Ident::new("config", Span::call_site()),
             children: children.into_iter().collect(),
         };
@@ -45,6 +53,7 @@ impl Parse for Node {
 
         let out = if input.lookahead1().peek(syn::token::Brace) {
             // --- A nested Internal ---
+            let forwarded_attrs = extract_attrs(&["derive"], &mut attrs);
 
             let inner;
             syn::braced!(inner in input);
@@ -52,6 +61,7 @@ impl Parse for Node {
 
             Self::Internal {
                 doc,
+                attrs: forwarded_attrs,
                 name,
                 children: fields.into_iter().collect(),
             }
@@ -146,6 +156,15 @@ fn extract_doc(attrs: &mut Vec<syn::Attribute>) -> Result<Vec<String>, Error> {
     attrs.retain(|attr| !attr.path.is_ident("doc"));
 
     Ok(out)
+}
+
+/// Extracts all attributes with a path contained in `names`.
+fn extract_attrs(names: &[&str], attrs: &mut Vec<syn::Attribute>) -> Vec<syn::Attribute> {
+    let (matches, rest) = attrs.drain(..)
+        .partition(|attr| names.iter().any(|n| attr.path.is_ident(n)));
+
+    *attrs = rest;
+    matches
 }
 
 fn extract_single_name_value_attr(
