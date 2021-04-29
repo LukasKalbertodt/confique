@@ -56,7 +56,7 @@ fn gen_raw_mod(input: &Input, visibility: &TokenStream) -> TokenStream {
 
                         quote! {
                             #name: Some({
-                                let result: Result<_, ::confique::serde::de::value::Error>
+                                let result: Result<_, confique::serde::de::value::Error>
                                     = Deserialize::deserialize(#expr.into_deserializer());
                                 result.expect(#msg)
                             }),
@@ -83,7 +83,7 @@ fn gen_raw_mod(input: &Input, visibility: &TokenStream) -> TokenStream {
             });
 
             contents.extend(quote! {
-                #[derive(Debug, Default, ::confique::serde::Deserialize)]
+                #[derive(Debug, Default, confique::serde::Deserialize)]
                 #[serde(deny_unknown_fields)]
                 #visibility struct #type_name {
                     #raw_fields
@@ -116,7 +116,7 @@ fn gen_raw_mod(input: &Input, visibility: &TokenStream) -> TokenStream {
         /// These types implement `serde::Deserialize`.
         mod raw {
             use super::*;
-            use ::confique::serde::{Deserialize, de::IntoDeserializer};
+            use confique::serde::{Deserialize, de::IntoDeserializer};
 
             #contents
         }
@@ -176,7 +176,7 @@ fn gen_root_mod(input: &Input, visibility: &TokenStream) -> TokenStream {
                 }
 
                 impl std::convert::TryFrom<raw::#type_name> for #type_name {
-                    type Error = ::confique::TryFromError;
+                    type Error = confique::TryFromError;
                     fn try_from(src: raw::#type_name) -> Result<Self, Self::Error> {
                         Ok(Self {
                             #try_from_fields

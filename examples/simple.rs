@@ -10,10 +10,10 @@ mod config {
             level: log::LevelFilter = "debug",
 
             /// If this is set, log messages are also written to this file.
-            #[example = "/var/log/tobira.log"]
+            #[example = "/var/log/test.log"]
             file: Option<PathBuf>,
         }
-    }
+    },
 }
 
 

@@ -4,9 +4,17 @@ version = "0.1.0"
 authors = ["Lukas Kalbertodt <lukas.kalbertodt@gmail.com>"]
 edition = "2018"
 
+
 [dependencies]
 confique-macro = { path = "macro" }
 serde = { version = "1", features = ["derive"] }
+log = { version = "0.4", features = ["serde"], optional = true }
 
 [dev-dependencies]
-log = { version = "0.4", features = ["serde", "std"] }
+log = { version = "0.4", features = ["serde"] }
+
+
+[features]
+# This is used to enable the `example` module. This is only useful to generate
+# the docs for this library!
+doc-example = ["log"]

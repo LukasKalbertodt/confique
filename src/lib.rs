@@ -1,10 +1,12 @@
+use std::fmt;
 
 pub use confique_macro::config as config;
 
 pub use serde;
 
 
-use std::fmt;
+#[cfg(feature = "doc-example")]
+pub mod example;
 
 
 /// Error for the `TryFrom` conversion from raw types to the main types.
