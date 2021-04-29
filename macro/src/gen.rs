@@ -11,35 +11,12 @@ pub(crate) fn gen(input: Input) -> TokenStream {
     let toml = gen_toml(&input);
     let root_mod = gen_root_mod(&input, &visibility);
     let raw_mod = gen_raw_mod(&input, &visibility);
-    let util_mod = gen_util_mod(&visibility);
 
     quote! {
         const TOML_TEMPLATE: &str = #toml;
 
         #root_mod
         #raw_mod
-        #util_mod
-    }
-}
-
-fn gen_util_mod(visibility: &TokenStream) -> TokenStream {
-    quote! {
-        mod util {
-            use std::fmt::{self, Write};
-
-            #[derive(Debug)]
-            #visibility struct TryFromError {
-                #visibility path: &'static str,
-            }
-
-            impl fmt::Display for TryFromError {
-                fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                    std::write!(f, "required configuration value is missing: '{}'", self.path)
-                }
-            }
-
-            impl std::error::Error for TryFromError {}
-        }
     }
 }
 
@@ -170,21 +147,18 @@ fn gen_root_mod(input: &Input, visibility: &TokenStream) -> TokenStream {
             let try_from_fields = collect_tokens(children, |node| {
                 match node {
                     Node::Leaf { name, ty, .. } => {
-                        match as_option(ty) {
+                        if as_option(ty).is_some() {
                             // If this value is optional, we just move it as it can never fail.
-                            Some(_) => quote! { #name: src.#name, },
-
+                            quote! { #name: src.#name, }
+                        } else {
                             // Otherwise, we return an error if the value hasn't been specified.
-                            None => {
-                                let path = match path.is_empty() {
-                                    true => name.to_string(),
-                                    false => format!("{}.{}", path.join("."), name),
-                                };
+                            let path = match path.is_empty() {
+                                true => name.to_string(),
+                                false => format!("{}.{}", path.join("."), name),
+                            };
 
-                                quote! {
-                                    #name: src.#name
-                                        .ok_or(self::util::TryFromError { path: #path })?,
-                                }
+                            quote! {
+                                #name: src.#name.ok_or(confique::TryFromError { path: #path })?,
                             }
                         }
                     },
@@ -202,7 +176,7 @@ fn gen_root_mod(input: &Input, visibility: &TokenStream) -> TokenStream {
                 }
 
                 impl std::convert::TryFrom<raw::#type_name> for #type_name {
-                    type Error = util::TryFromError;
+                    type Error = ::confique::TryFromError;
                     fn try_from(src: raw::#type_name) -> Result<Self, Self::Error> {
                         Ok(Self {
                             #try_from_fields
