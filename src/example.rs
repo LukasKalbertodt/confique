@@ -12,6 +12,9 @@ use std::{net::IpAddr, path::PathBuf};
 use crate as confique;
 
 crate::config! {
+    //! An example configuration.
+    #![visibility = "pub"]
+
     dns: {
         /// The DNS server IP address.
         #[example = "1.1.1.1"]

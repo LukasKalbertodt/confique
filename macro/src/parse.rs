@@ -14,8 +14,14 @@ impl Parse for Input {
     fn parse(input: ParseStream) -> Result<Self, syn::Error> {
         let mut outer_attrs = input.call(syn::Attribute::parse_inner)?;
         let doc = extract_doc(&mut outer_attrs)?;
-        let children = input.call(<Punctuated<_, syn::Token![,]>>::parse_terminated)?;
+
+        // `#![visibility = "..."]`
+        let visibility = extract_single_name_value_attr("visibility", &mut outer_attrs)?
+            .map(|v| Ok::<_, syn::Error>(assert_string_lit(v)?.parse::<TokenStream>()?))
+            .transpose()?;
+
         assert_no_extra_attrs(&outer_attrs)?;
+        let children = input.call(<Punctuated<_, syn::Token![,]>>::parse_terminated)?;
 
         let root = Node::Internal {
             doc,
@@ -23,7 +29,7 @@ impl Parse for Input {
             children: children.into_iter().collect(),
         };
 
-        Ok(Self { root })
+        Ok(Self { root, visibility })
     }
 }
 
@@ -140,4 +146,40 @@ fn extract_doc(attrs: &mut Vec<syn::Attribute>) -> Result<Vec<String>, Error> {
     attrs.retain(|attr| !attr.path.is_ident("doc"));
 
     Ok(out)
+}
+
+fn extract_single_name_value_attr(
+    name: &str,
+    attrs: &mut Vec<syn::Attribute>,
+) -> Result<Option<syn::Lit>, Error> {
+    let mut filtered = attrs.iter().filter(|attr| attr.path.is_ident(name));
+    let meta = match filtered.next() {
+        None => return Ok(None),
+        Some(attr) => attr.parse_meta()?,
+    };
+
+    let nv = match meta {
+        syn::Meta::NameValue(nv) => nv,
+        other => {
+            let msg = format!(r#"expected `name = "value"` attribute syntax for `{}`"#, name);
+            return Err(Error::new(other.span(), msg));
+        }
+    };
+
+    if let Some(dupe) = filtered.next() {
+        let msg = format!("duplicate `{}` attribute", name);
+        return Err(Error::new(dupe.span(), msg));
+    }
+
+    // Remove the attribute from the vector
+    attrs.retain(|attr| !attr.path.is_ident(name));
+
+    Ok(Some(nv.lit))
+}
+
+fn assert_string_lit(lit: syn::Lit) -> Result<String, Error> {
+    match lit {
+        syn::Lit::Str(s) => Ok(s.value()),
+        _ => Err(Error::new(lit.span(), "expected string literal")),
+    }
 }

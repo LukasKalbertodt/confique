@@ -1,8 +1,12 @@
 //! Definition of the intermediate representation or AST.
 
+use proc_macro2::TokenStream;
+
+
 /// The parsed input to the `gen_config` macro.
 pub(crate) struct Input {
     pub(crate) root: Node,
+    pub(crate) visibility: Option<TokenStream>,
 }
 
 /// One node in the tree of the configuration format. Can either be a leaf node

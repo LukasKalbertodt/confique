@@ -7,7 +7,7 @@ use crate::ast::{Expr, Input, Node};
 
 
 pub(crate) fn gen(input: Input) -> TokenStream {
-    let visibility = quote! { pub(crate) };
+    let visibility = input.visibility.clone().unwrap_or(quote! { pub(crate) });
     let toml = gen_toml(&input);
     let root_mod = gen_root_mod(&input, &visibility);
     let raw_mod = gen_raw_mod(&input, &visibility);
