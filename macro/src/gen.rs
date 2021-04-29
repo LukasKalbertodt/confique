@@ -13,7 +13,7 @@ pub(crate) fn gen(input: Input) -> TokenStream {
     let raw_mod = gen_raw_mod(&input, &visibility);
 
     quote! {
-        const TOML_TEMPLATE: &str = #toml;
+        #visibility const TOML_TEMPLATE: &str = #toml;
 
         #root_mod
         #raw_mod
@@ -114,7 +114,7 @@ fn gen_raw_mod(input: &Input, visibility: &TokenStream) -> TokenStream {
         /// required values.
         ///
         /// These types implement `serde::Deserialize`.
-        mod raw {
+        #visibility mod raw {
             use super::*;
             use confique::serde::{Deserialize, de::IntoDeserializer};
 
