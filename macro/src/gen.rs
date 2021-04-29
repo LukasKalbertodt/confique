@@ -217,19 +217,12 @@ fn gen_types(input: &Input, visibility: &TokenStream) -> TokenStream {
             // Main type definition
             let doc = &node.doc;
             let attrs = &node.attrs;
-
-            // We add some derives if the user has not specified any
-            let derive = if attrs.iter().any(|attr| attr.path.is_ident("derive")) {
-                quote! {}
-            } else {
-                quote! { #[derive(Debug)] }
-            };
+            let derives = input.derive_for_all.clone().unwrap_or(quote! { Debug });
 
             main_types.extend(quote! {
                 #( #[doc = #doc] )*
                 #( #attrs )*
-                #derive
-
+                #[derive( #derives )]
                 #visibility struct #typename {
                     #main_fields
                 }

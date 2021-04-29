@@ -7,6 +7,7 @@ use proc_macro2::{Ident, TokenStream};
 pub(crate) struct Input {
     pub(crate) root: Node,
     pub(crate) visibility: Option<TokenStream>,
+    pub(crate) derive_for_all: Option<TokenStream>,
 }
 
 /// One node in the tree of the configuration format. Can either be a leaf node

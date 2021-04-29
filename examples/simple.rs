@@ -3,7 +3,8 @@ mod config {
     use std::path::PathBuf;
 
     confique::config! {
-        #[derive(Debug, Clone)]
+        #![derive_for_all(Debug, Clone)]
+
         log: {
             /// Determines how many messages are logged. Log messages below
             /// this level are not emitted. Possible values: "trace", "debug",

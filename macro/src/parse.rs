@@ -1,4 +1,5 @@
 use proc_macro2::{Span, TokenStream};
+use quote::ToTokens;
 use syn::{
     Error, Ident,
     parse::{Parse, ParseStream},
@@ -13,8 +14,10 @@ use crate::ast::{Expr, Input, Leaf, Node, NodeKind, Obj};
 impl Parse for Input {
     fn parse(input: ParseStream) -> Result<Self, syn::Error> {
         let mut outer_attrs = input.call(syn::Attribute::parse_inner)?;
-        let doc = extract_doc(&mut outer_attrs)?;
         let visibility = extract_visibility(&mut outer_attrs)?;
+        let derive_for_all = extract_single_list_attr("derive_for_all", &mut outer_attrs)?;
+
+        let doc = extract_doc(&mut outer_attrs)?;
         let typename = extract_typename(&mut outer_attrs)?;
 
         // Extract attributes that we will just forward/emit verbatim. Well, not
@@ -24,8 +27,9 @@ impl Parse for Input {
             a.style = syn::AttrStyle::Outer;
         }
 
-
         assert_no_extra_attrs(&outer_attrs)?;
+
+        // Parse children
         let children = input.call(<Punctuated<_, syn::Token![,]>>::parse_terminated)?;
 
         let root = Node {
@@ -38,7 +42,7 @@ impl Parse for Input {
             }),
         };
 
-        Ok(Self { root, visibility })
+        Ok(Self { root, visibility, derive_for_all })
     }
 }
 
@@ -177,33 +181,57 @@ fn extract_attrs(names: &[&str], attrs: &mut Vec<syn::Attribute>) -> Vec<syn::At
     matches
 }
 
-fn extract_single_name_value_attr(
+fn extract_single_attr(
     name: &str,
     attrs: &mut Vec<syn::Attribute>,
-) -> Result<Option<syn::Lit>, Error> {
-    let mut filtered = attrs.iter().filter(|attr| attr.path.is_ident(name));
-    let meta = match filtered.next() {
+) -> Result<Option<syn::Attribute>, Error> {
+    let attr = match attrs.iter().position(|attr| attr.path.is_ident(name)) {
         None => return Ok(None),
-        Some(attr) => attr.parse_meta()?,
+        Some(pos) => attrs.remove(pos),
     };
 
-    let nv = match meta {
-        syn::Meta::NameValue(nv) => nv,
-        other => {
-            let msg = format!(r#"expected `name = "value"` attribute syntax for `{}`"#, name);
-            return Err(Error::new(other.span(), msg));
-        }
-    };
-
-    if let Some(dupe) = filtered.next() {
+    if let Some(dupe) = attrs.iter().find(|attr| attr.path.is_ident(name)) {
         let msg = format!("duplicate `{}` attribute", name);
         return Err(Error::new(dupe.span(), msg));
     }
 
-    // Remove the attribute from the vector
-    attrs.retain(|attr| !attr.path.is_ident(name));
+    Ok(Some(attr))
+}
 
-    Ok(Some(nv.lit))
+fn extract_single_name_value_attr(
+    name: &str,
+    attrs: &mut Vec<syn::Attribute>,
+) -> Result<Option<syn::Lit>, Error> {
+    let attr = match extract_single_attr(name, attrs)? {
+        None => return Ok(None),
+        Some(attr) => attr,
+    };
+
+    match attr.parse_meta()? {
+        syn::Meta::NameValue(nv) => Ok(Some(nv.lit)),
+        other => {
+            let msg = format!(r#"expected `name = "value"` attribute syntax for `{}`"#, name);
+            Err(Error::new(other.span(), msg))
+        }
+    }
+}
+
+fn extract_single_list_attr(
+    name: &str,
+    attrs: &mut Vec<syn::Attribute>,
+) -> Result<Option<TokenStream>, Error> {
+    let attr = match extract_single_attr(name, attrs)? {
+        None => return Ok(None),
+        Some(attr) => attr,
+    };
+
+    match attr.parse_meta()? {
+        syn::Meta::List(list) => Ok(Some(list.nested.to_token_stream())),
+        other => {
+            let msg = format!(r#"expected `{}(...)` attribute syntax"#, name);
+            return Err(Error::new(other.span(), msg));
+        }
+    }
 }
 
 fn assert_string_lit(lit: syn::Lit) -> Result<String, Error> {
