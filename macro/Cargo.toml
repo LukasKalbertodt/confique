@@ -1,0 +1,14 @@
+[package]
+name = "confique-macro"
+version = "0.0.1"
+authors = ["Lukas Kalbertodt <lukas.kalbertodt@gmail.com>"]
+edition = "2018"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = "1.0"
+quote = "1.0"
+proc-macro2 = "1.0"
+heck = "0.3.2"

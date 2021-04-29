@@ -4,6 +4,9 @@ version = "0.1.0"
 authors = ["Lukas Kalbertodt <lukas.kalbertodt@gmail.com>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
+confique-macro = { path = "macro" }
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+log = { version = "0.4", features = ["serde", "std"] }
