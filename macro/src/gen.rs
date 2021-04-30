@@ -314,13 +314,13 @@ fn gen_toml(input: &Input) -> String {
                     }
                 }
 
-                // We check that already when parsing.
-                let example = example.as_ref()
-                    .or(default.as_ref())
-                    .expect("neither example nor default");
+                // Commented out key and optional example.
+                match example.as_ref().or(default.as_ref()) {
+                    Some(example) => writeln!(out, "#{} = {}", name, example).unwrap(),
+                    None => writeln!(out, "#{} =", name).unwrap()
+                }
 
-                // Commented out example.
-                writeln!(out, "#{} = {}", name, example).unwrap();
+
                 add_empty_line(&mut out);
             }
         }

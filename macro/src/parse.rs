@@ -94,11 +94,6 @@ impl Parse for Node {
                 })
                 .transpose()?;
 
-            if example.is_none() && default.is_none() {
-                let msg = "either a default value or an example value has to be specified";
-                return Err(Error::new(name.span(), msg));
-            }
-
             Self {
                 doc,
                 attrs: vec![],
