@@ -1,4 +1,4 @@
-use proc_macro2::{Span, TokenStream};
+use proc_macro2::TokenStream;
 use quote::ToTokens;
 use syn::{
     Error, Ident,
@@ -16,31 +16,28 @@ impl Parse for Input {
         let mut outer_attrs = input.call(syn::Attribute::parse_inner)?;
         let visibility = extract_visibility(&mut outer_attrs)?;
         let derive_for_all = extract_single_list_attr("derive_for_all", &mut outer_attrs)?;
-
-        let doc = extract_doc(&mut outer_attrs)?;
-        let typename = extract_typename(&mut outer_attrs)?;
-
-        // Extract attributes that we will just forward/emit verbatim. Well, not
-        // completely verbatim: we have to change the type to outer attribute.
-        let mut forwarded_attrs = extract_attrs(&["derive"], &mut outer_attrs);
-        for a in &mut forwarded_attrs {
-            a.style = syn::AttrStyle::Outer;
-        }
-
         assert_no_extra_attrs(&outer_attrs)?;
 
-        // Parse children
-        let children = input.call(<Punctuated<_, syn::Token![,]>>::parse_terminated)?;
+        // Parse top level object.
+        let root: Node = input.parse()?;
+        if root.name != "config" {
+            return Err(syn::Error::new(
+                root.name.span(),
+                "top level object must have the name 'config'",
+            ));
+        }
 
-        let root = Node {
-            doc,
-            attrs: forwarded_attrs,
-            name: Ident::new("config", Span::call_site()),
-            kind: NodeKind::Obj(Obj {
-                typename,
-                children: children.into_iter().collect(),
-            }),
-        };
+        // Make sure we have at most one trailing comma
+        if input.peek(syn::Token![,]) {
+            let _: syn::Token![,] = input.parse().unwrap();
+        }
+
+        if !input.is_empty() {
+            return Err(syn::Error::new(
+                input.span(),
+                "unexpected additional tokens (only one root element allowed)",
+            ));
+        }
 
         Ok(Self { root, visibility, derive_for_all })
     }

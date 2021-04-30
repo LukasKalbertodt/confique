@@ -12,31 +12,32 @@ use std::{net::IpAddr, path::PathBuf};
 use crate as confique;
 
 crate::config! {
-    //! An example configuration.
+    // This is used here to make all items show up in the documentation.
     #![visibility = "pub"]
-    #![derive(Clone)]
 
-    #[derive(Clone, Copy)]
-    dns: {
-        /// The DNS server IP address.
-        #[example = "1.1.1.1"]
-        server: IpAddr,
+    /// An example configuration.
+    config: {
+        dns: {
+            /// The DNS server IP address.
+            #[example = "1.1.1.1"]
+            server: IpAddr,
 
-        /// Whether to use a local DNS resolution cache.
-        use_cache: bool = true,
+            /// Whether to use a local DNS resolution cache.
+            use_cache: bool = true,
 
-        /// How often to reattempt reaching the DNS server.
-        retry_attempts: u32 = 27,
-    },
+            /// How often to reattempt reaching the DNS server.
+            retry_attempts: u32 = 27,
+        },
 
-    #[typename = "Logger"]
-    log: {
-        /// Sets the log level. Possible values: "trace", "debug", "info",
-        /// "warn", "error" and "off".
-        level: log::LevelFilter = "info",
+        #[typename = "Logger"]
+        log: {
+            /// Sets the log level. Possible values: "trace", "debug", "info",
+            /// "warn", "error" and "off".
+            level: log::LevelFilter = "info",
 
-        /// If this is set, log messages are also written to this file.
-        #[example = "/var/log/test.log"]
-        file: Option<PathBuf>,
-    },
+            /// If this is set, log messages are also written to this file.
+            #[example = "/var/log/test.log"]
+            file: Option<PathBuf>,
+        },
+    }
 }
