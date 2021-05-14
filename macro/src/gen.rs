@@ -2,7 +2,7 @@ use proc_macro2::TokenStream;
 use quote::{ToTokens, format_ident, quote};
 use syn::Ident;
 
-use crate::ir;
+use crate::ir::{self, FieldKind};
 
 
 pub(crate) fn gen(input: ir::Input) -> TokenStream {
@@ -22,14 +22,24 @@ fn gen_config_impl(input: &ir::Input) -> TokenStream {
     let field_names = input.fields.iter().map(|f| &f.name);
     let from_exprs = input.fields.iter().map(|f| {
         let field_name = &f.name;
-        match unwrap_option(&f.ty) {
-            Some(_) => quote! { partial.#field_name },
-            None => {
-                let path = field_name.to_string();
-                quote! {
-                    partial.#field_name.ok_or(confique::Error::MissingValue(#path))?
-                }
+        let path = field_name.to_string();
+        if !f.is_leaf() {
+            quote! {
+                confique::Config::from_partial(partial.#field_name).map_err(|e| {
+                    match e {
+                        confique::Error::MissingValue(path) => {
+                            confique::Error::MissingValue(format!("{}.{}", #path, path))
+                        }
+                        e => e,
+                    }
+                })?
             }
+        } else if unwrap_option(&f.ty).is_none() {
+            quote! {
+                partial.#field_name.ok_or(confique::Error::MissingValue(#path.into()))?
+            }
+        } else {
+            quote! { partial.#field_name }
         }
     });
 
@@ -65,13 +75,25 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
     // Prepare some tokens per field.
     let field_names = input.fields.iter().map(|f| &f.name).collect::<Vec<_>>();
     let field_types = input.fields.iter().map(|f| {
-        let inner = unwrap_option(&f.ty).unwrap_or(&f.ty);
-        quote! { Option<#inner> }
+        if f.is_leaf() {
+            let inner = unwrap_option(&f.ty).unwrap_or(&f.ty);
+            quote! { Option<#inner> }
+        } else {
+            let ty = &f.ty;
+            quote! { <#ty as confique::Config>::Partial }
+        }
+    });
+    let empty_values = input.fields.iter().map(|f| {
+        if f.is_leaf() {
+            quote! { None }
+        } else {
+            quote! { confique::Partial::empty() }
+        }
     });
     let defaults = input.fields.iter().map(|f| {
-        match &f.default {
-            None => quote! { None },
-            Some(default) => {
+        match &f.kind {
+            FieldKind::Leaf { default: None } => quote! { None },
+            FieldKind::Leaf { default: Some(default) } => {
                 let msg = format!(
                     "default config value for `{}::{}` cannot be deserialized",
                     input.name,
@@ -81,7 +103,22 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
                 quote! {
                     Some(confique::internal::deserialize_default(#default).expect(#msg))
                 }
-            },
+            }
+            FieldKind::Child => {
+                if unwrap_option(&f.ty).is_some() {
+                    quote! { Some(confique::Partial::default_values()) }
+                } else {
+                    quote! { confique::Partial::default_values() }
+                }
+            }
+        }
+    });
+    let fallbacks= input.fields.iter().map(|f| {
+        let name = &f.name;
+        if f.is_leaf() {
+            quote! { self.#name.or(fallback.#name) }
+        } else {
+            quote! { self.#name.with_fallback(fallback.#name) }
         }
     });
 
@@ -97,7 +134,7 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
             impl confique::Partial for #struct_name {
                 fn empty() -> Self {
                     Self {
-                        #( #field_names: None, )*
+                        #( #field_names: #empty_values, )*
                     }
                 }
 
@@ -109,7 +146,7 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
 
                 fn with_fallback(self, fallback: Self) -> Self {
                     Self {
-                        #( #field_names: self.#field_names.or(fallback.#field_names), )*
+                        #( #field_names: #fallbacks, )*
                     }
                 }
             }

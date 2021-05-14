@@ -31,7 +31,7 @@ pub enum Error {
     /// Returned by `Config::from_partial` when the partial does not contain
     /// values for all required configuration values. The string is a
     /// human-readable path to the value, e.g. `http.port`.
-    MissingValue(&'static str),
+    MissingValue(String),
 }
 
 impl std::error::Error for Error {}

@@ -17,12 +17,20 @@ pub(crate) struct Field {
     pub(crate) doc: Vec<String>,
     pub(crate) name: syn::Ident,
     pub(crate) ty: syn::Type,
-    pub(crate) default: Option<Expr>,
+    pub(crate) kind: FieldKind,
 
     // TODO:
     // - serde attributes
     // - attributes
     // - example
+}
+
+#[derive(Debug)]
+pub(crate) enum FieldKind {
+    Leaf {
+        default: Option<Expr>,
+    },
+    Child,
 }
 
 /// The kinds of expressions (just literals) we allow for default or example
@@ -65,14 +73,33 @@ impl Field {
     fn from_ast(mut field: syn::Field) -> Result<Self, Error> {
         let doc = extract_doc(&mut field.attrs);
         let attrs = extract_internal_attrs(&mut field.attrs)?;
+
         // TODO: check no other attributes are here
+        let kind = if attrs.child {
+            if attrs.default.is_some() {
+                return Err(Error::new(
+                    field.ident.span(),
+                    "cannot specify `child` and `default` attributes at the same time",
+                ));
+            }
+
+            FieldKind::Child
+        } else {
+            FieldKind::Leaf {
+                default: attrs.default,
+            }
+        };
 
         Ok(Self {
             doc,
-            default: attrs.default,
             name: field.ident.expect("bug: expected named field"),
             ty: field.ty,
+            kind,
         })
+    }
+
+    pub(crate) fn is_leaf(&self) -> bool {
+        matches!(self.kind, FieldKind::Leaf { .. })
     }
 }
 
@@ -139,19 +166,29 @@ fn extract_internal_attrs(
         }
     });
 
+
     let mut out = InternalAttrs::default();
     for attr in internal_attrs {
-        match attr.parse_args::<InternalAttr>()? {
-            InternalAttr::Default(expr) => {
-                if out.default.is_some() {
-                    let msg = format!(
-                        "duplicate '{}' confique attribute",
-                        attr.path.get_ident().unwrap()
-                    );
-                    return Err(Error::new(attr.span(), msg));
-                }
+        let parsed = attr.parse_args::<InternalAttr>()?;
+        let keyword = parsed.keyword();
 
+        macro_rules! duplicate_if {
+            ($cond:expr) => {
+                if $cond {
+                    let msg = format!("duplicate '{}' confique attribute", keyword);
+                    return Err(Error::new(attr.tokens.span(), msg));
+                }
+            };
+        }
+
+        match parsed {
+            InternalAttr::Default(expr) => {
+                duplicate_if!(out.default.is_some());
                 out.default = Some(expr);
+            }
+            InternalAttr::Child => {
+                duplicate_if!(out.child);
+                out.child = true;
             }
         }
     }
@@ -161,24 +198,38 @@ fn extract_internal_attrs(
 
 #[derive(Default)]
 struct InternalAttrs {
+    child: bool,
     default: Option<Expr>,
 }
 
 enum InternalAttr {
+    Child,
     Default(Expr),
+}
+
+impl InternalAttr {
+    fn keyword(&self) -> &'static str {
+        match self {
+            Self::Child => "child",
+            Self::Default(_) => "default",
+        }
+    }
 }
 
 impl Parse for InternalAttr {
     fn parse(input: ParseStream) -> Result<Self, syn::Error> {
         let ident: syn::Ident = input.parse()?;
         match &*ident.to_string() {
+            "child" => {
+                assert_empty(input)?;
+                Ok(Self::Child)
+            }
             "default" => {
                 let _: Token![=] = input.parse()?;
                 let expr = Expr::from_lit(input.parse()?)?;
                 assert_empty(input)?;
                 Ok(Self::Default(expr))
             }
-
             _ => Err(syn::Error::new(ident.span(), "unknown confique attribute")),
         }
     }
