@@ -175,10 +175,19 @@ impl Parse for InternalAttr {
             "default" => {
                 let _: Token![=] = input.parse()?;
                 let expr = Expr::from_lit(input.parse()?)?;
+                assert_empty(input)?;
                 Ok(Self::Default(expr))
             }
 
             _ => Err(syn::Error::new(ident.span(), "unknown confique attribute")),
         }
+    }
+}
+
+fn assert_empty(input: ParseStream) -> Result<(), Error> {
+    if input.is_empty() {
+        Ok(())
+    } else {
+        Err(Error::new(input.span(), "unexpected tokens, expected no more tokens in this context"))
     }
 }
