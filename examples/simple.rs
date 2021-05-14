@@ -1,26 +1,18 @@
+use std::net::IpAddr;
+use confique::{Config, Partial};
 
-mod config {
-    use std::path::PathBuf;
+#[derive(Debug, Config)]
+struct Http {
+    #[config(default = 8080)]
+    port: u16,
 
-    confique::config! {
-        #![derive_for_all(Debug, Clone)]
+    #[config(default = "127.0.0.1")]
+    bind: IpAddr,
 
-        config: {
-            log: {
-                /// Determines how many messages are logged. Log messages below
-                /// this level are not emitted. Possible values: "trace", "debug",
-                /// "info", "warn", "error" and "off".
-                level: log::LevelFilter = "debug",
-
-                /// If this is set, log messages are also written to this file.
-                #[example = "/var/log/test.log"]
-                file: Option<PathBuf>,
-            },
-        }
-    }
+    foo: Option<String>,
 }
 
 
 fn main() {
-
+    println!("{:?}", Http::from_partial(<Http as Config>::Partial::default_values()));
 }
