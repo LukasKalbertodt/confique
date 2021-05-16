@@ -26,6 +26,12 @@ impl<C: Config> Source<C> for PathBuf {
     }
 }
 
+/// A file as source for configuration.
+///
+/// Most of the time, you can problably use the [`Source`] impl for
+/// `Path`/`PathBuf`, but this type gives you more control. For one, you can
+/// explicitly set the file format. You can also mark a file as required,
+/// meaning that an error will be returned if the file does not exist.
 pub struct File {
     path: PathBuf,
     format: FileFormat,
@@ -102,12 +108,17 @@ impl<C: Config> Source<C> for File {
     }
 }
 
+/// All file formats supported by confique.
+///
+/// All enum variants are `#[cfg]` guarded with the respective crate feature.
 pub enum FileFormat {
     #[cfg(feature = "toml")] Toml,
     #[cfg(feature = "yaml")] Yaml,
 }
 
 impl FileFormat {
+    /// Guesses the file format from a file extension, returning `None` if the
+    /// extension is unknown or if the respective crate feature is not enabled.
     pub fn from_extension(ext: impl AsRef<OsStr>) -> Option<Self> {
         match ext.as_ref().to_str()? {
             #[cfg(feature = "toml")]
