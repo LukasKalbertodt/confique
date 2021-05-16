@@ -26,17 +26,12 @@ fn gen_config_impl(input: &ir::Input) -> TokenStream {
         if !f.is_leaf() {
             quote! {
                 confique::Config::from_partial(partial.#field_name).map_err(|e| {
-                    match e {
-                        confique::Error::MissingValue(path) => {
-                            confique::Error::MissingValue(format!("{}.{}", #path, path))
-                        }
-                        e => e,
-                    }
+                    confique::internal::prepend_missing_value_error(e, #path)
                 })?
             }
         } else if unwrap_option(&f.ty).is_none() {
             quote! {
-                partial.#field_name.ok_or(confique::Error::MissingValue(#path.into()))?
+                partial.#field_name.ok_or(confique::internal::missing_value_error(#path.into()))?
             }
         } else {
             quote! { partial.#field_name }

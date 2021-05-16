@@ -1,5 +1,5 @@
-use std::net::IpAddr;
-use confique::{Config, Partial};
+use std::{net::IpAddr, path::Path};
+use confique::Config;
 
 #[derive(Debug, Config)]
 struct Conf {
@@ -26,6 +26,13 @@ struct Cat {
 }
 
 
-fn main() {
-    println!("{:#?}", Conf::from_partial(<Conf as Config>::Partial::default_values()));
+fn main() -> Result<(), anyhow::Error> {
+    let r = Conf::from_sources(&[
+        &Path::new("examples/files/simple.toml"),
+        &Path::new("examples/files/etc/simple.yaml"),
+    ])?;
+
+    println!("{:#?}", r);
+
+    Ok(())
 }

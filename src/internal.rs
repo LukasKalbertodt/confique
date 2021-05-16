@@ -2,10 +2,25 @@
 //! intended to be used directly. None of this is covered by semver! Do not use
 //! any of this directly.
 
+use crate::{Error, ErrorInner};
+
 pub fn deserialize_default<I, O>(src: I) -> Result<O, serde::de::value::Error>
 where
     I: for<'de> serde::de::IntoDeserializer<'de>,
     O: for<'de> serde::Deserialize<'de>,
 {
     O::deserialize(src.into_deserializer())
+}
+
+pub fn missing_value_error(path: String) -> Error {
+    ErrorInner::MissingValue(path).into()
+}
+
+pub fn prepend_missing_value_error(e: Error, prefix: &str) -> Error {
+    match *e.inner {
+        ErrorInner::MissingValue(path) => {
+            ErrorInner::MissingValue(format!("{}.{}", prefix, path)).into()
+        }
+        e => e.into(),
+    }
 }

@@ -5,16 +5,21 @@ authors = ["Lukas Kalbertodt <lukas.kalbertodt@gmail.com>"]
 edition = "2018"
 
 
-[dependencies]
-confique-macro = { path = "macro" }
-serde = { version = "1", features = ["derive"] }
-log = { version = "0.4", features = ["serde"], optional = true }
-
-[dev-dependencies]
-log = { version = "0.4", features = ["serde"] }
-
-
 [features]
+default = ["toml", "yaml"]
+yaml = ["serde_yaml"]
+
 # This is used to enable the `example` module. This is only useful to generate
 # the docs for this library!
 doc-example = ["log"]
+
+[dependencies]
+confique-macro = { path = "macro" }
+log = { version = "0.4", features = ["serde"], optional = true }
+serde = { version = "1", features = ["derive"] }
+serde_yaml = { version = "0.8", optional = true }
+toml = { version = "0.5", optional = true }
+
+[dev-dependencies]
+log = { version = "0.4", features = ["serde"] }
+anyhow = "1"
