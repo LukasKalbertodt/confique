@@ -74,13 +74,17 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
 
     // Prepare some tokens per field.
     let field_names = input.fields.iter().map(|f| &f.name).collect::<Vec<_>>();
-    let field_types = input.fields.iter().map(|f| {
+    let struct_fields = input.fields.iter().map(|f| {
+        let name = &f.name;
         if f.is_leaf() {
             let inner = unwrap_option(&f.ty).unwrap_or(&f.ty);
-            quote! { Option<#inner> }
+            quote! { #inner_visibility #name: Option<#inner>, }
         } else {
             let ty = &f.ty;
-            quote! { <#ty as confique::Config>::Partial }
+            quote! {
+                #[serde(default = "confique::Partial::empty")]
+                #inner_visibility #name: <#ty as confique::Config>::Partial,
+            }
         }
     });
     let empty_values = input.fields.iter().map(|f| {
@@ -128,7 +132,7 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
 
             #[derive(confique::serde::Deserialize)]
             #inner_visibility struct #struct_name {
-                #( #inner_visibility #field_names: #field_types, )*
+                #( #struct_fields )*
             }
 
             impl confique::Partial for #struct_name {
