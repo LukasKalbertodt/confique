@@ -1,6 +1,6 @@
 use std::{ffi::OsStr, fs, io, path::{Path, PathBuf}};
 
-use crate::{Config, Error, ErrorInner, Partial, Source};
+use crate::{Config, Error, Partial, Source, error::ErrorInner};
 
 
 impl<C: Config> Source<C> for &Path {

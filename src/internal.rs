@@ -2,7 +2,7 @@
 //! intended to be used directly. None of this is covered by semver! Do not use
 //! any of this directly.
 
-use crate::{Error, ErrorInner};
+use crate::{Error, error::ErrorInner};
 
 pub fn deserialize_default<I, O>(src: I) -> Result<O, serde::de::value::Error>
 where
