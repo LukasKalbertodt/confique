@@ -35,22 +35,13 @@ pub struct File {
 }
 
 impl File {
+    /// Creates an optional file source.
     pub fn new(path: impl Into<PathBuf>, format: FileFormat) -> Self {
         Self {
             path: path.into(),
             format,
             required: false,
         }
-    }
-
-    #[cfg(feature = "toml")]
-    pub fn toml(path: impl Into<PathBuf>) -> Self {
-        Self::new(path, FileFormat::Toml)
-    }
-
-    #[cfg(feature = "yaml")]
-    pub fn yaml(path: impl Into<PathBuf>) -> Self {
-        Self::new(path, FileFormat::Yaml)
     }
 
     /// Marks this file as required, meaning that `<File as Source<_>>::load`
