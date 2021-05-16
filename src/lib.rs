@@ -2,18 +2,15 @@ use std::{ffi::OsString, fmt, path::PathBuf};
 
 use serde::Deserialize;
 
-
-pub use serde;
-pub use confique_macro::Config;
-
-
-// #[cfg(feature = "doc-example")]
-// pub mod example;
-
 #[doc(hidden)]
 pub mod internal;
 
-pub mod source;
+mod file;
+
+
+pub use serde;
+pub use confique_macro::Config;
+pub use self::file::{File, FileFormat};
 
 
 /// A configuration object that can be deserialized in layers via `serde`.

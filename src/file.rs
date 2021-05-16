@@ -1,10 +1,6 @@
-//! Types implementing [`Source`], thus representing some source of
-//! configuration values.
-
 use std::{ffi::OsStr, fs, io, path::{Path, PathBuf}};
 
 use crate::{Config, Error, ErrorInner, Partial, Source};
-
 
 
 impl<C: Config> Source<C> for &Path {
