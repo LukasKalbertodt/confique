@@ -7,6 +7,9 @@ mod error;
 mod file;
 pub mod meta;
 
+#[cfg(feature = "toml")]
+pub mod toml;
+
 
 pub use serde;
 pub use confique_macro::Config;
