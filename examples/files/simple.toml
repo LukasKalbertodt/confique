@@ -1,2 +1,2 @@
-[cat]
-foo = "yes"
+[log]
+stdout = false

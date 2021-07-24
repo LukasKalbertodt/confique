@@ -1,40 +1,53 @@
-use std::{net::IpAddr, path::Path};
-use confique::Config;
+use std::{net::IpAddr, path::{Path, PathBuf}};
+use confique::{Config, toml::FormatOptions};
 
 #[derive(Debug, Config)]
+/// A sample configuration for our app.
 struct Conf {
     #[config(nested)]
     http: Http,
 
     #[config(nested)]
-    cat: Cat,
+    log: LogConfig,
 }
 
-
+/// Configuring the HTTP server of our app.
 #[derive(Debug, Config)]
 struct Http {
-    #[config(default = 8080)]
+    /// The port the server will listen on.
     port: u16,
 
+    /// The bind address of the server. Can be set to `0.0.0.0` for example, to
+    /// allow other users of the network to access the server.
     #[config(default = "127.0.0.1")]
     bind: IpAddr,
 }
 
 #[derive(Debug, Config)]
-struct Cat {
-    foo: Option<String>,
+struct LogConfig {
+    /// If set to `true`, the app will log to stdout.
+    #[config(default = true)]
+    stdout: bool,
+
+    /// If this is set, the app will write logs to the given file. Of course,
+    /// the app has to have write access to that file.
+    file: Option<PathBuf>,
 }
 
 
 fn main() -> Result<(), anyhow::Error> {
-    println!("{:#?}", Conf::META);
+    println!("TEMPLATE:");
+    println!("--------------------------------------------------------");
+    print!("{}", confique::toml::format::<Conf>(FormatOptions::default()));
+    println!("--------------------------------------------------------");
 
     let r = Conf::from_sources(&[
         &Path::new("examples/files/simple.toml"),
         &Path::new("examples/files/etc/simple.yaml"),
     ])?;
 
-    println!("{:#?}", r);
+    println!();
+    println!("LOADED CONFIGURATION: {:#?}", r);
 
     Ok(())
 }
