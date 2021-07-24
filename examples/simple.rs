@@ -27,6 +27,8 @@ struct Cat {
 
 
 fn main() -> Result<(), anyhow::Error> {
+    println!("{:#?}", Conf::META);
+
     let r = Conf::from_sources(&[
         &Path::new("examples/files/simple.toml"),
         &Path::new("examples/files/etc/simple.yaml"),

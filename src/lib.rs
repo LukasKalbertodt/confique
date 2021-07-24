@@ -5,6 +5,7 @@ pub mod internal;
 
 mod error;
 mod file;
+pub mod meta;
 
 
 pub use serde;
@@ -39,6 +40,12 @@ pub trait Config: Sized {
     /// layers will result in a configuration object that has all required
     /// values defined.
     type Partial: Partial;
+
+    /// A description of this configuration.
+    ///
+    /// This is a runtime representation from the struct definition of your
+    /// configuration type.
+    const META: meta::Meta;
 
     /// Tries to create `Self` from a potentially partial object.
     ///

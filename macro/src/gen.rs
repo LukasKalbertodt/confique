@@ -1,8 +1,8 @@
-use proc_macro2::TokenStream;
+use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, format_ident, quote};
 use syn::Ident;
 
-use crate::ir::{self, FieldKind};
+use crate::ir::{self, Expr, FieldKind};
 
 
 pub(crate) fn gen(input: ir::Input) -> TokenStream {
@@ -38,6 +38,8 @@ fn gen_config_impl(input: &ir::Input) -> TokenStream {
         }
     });
 
+
+    let meta_item = gen_meta(input);
     quote! {
         impl confique::Config for #name {
             type Partial = #partial_mod_name::#partial_struct_name;
@@ -47,6 +49,8 @@ fn gen_config_impl(input: &ir::Input) -> TokenStream {
                     #( #field_names: #from_exprs, )*
                 })
             }
+
+            #meta_item
         }
     }
 }
@@ -153,6 +157,119 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
     }
 }
 
+
+/// Generates the whole `const META` item.
+fn gen_meta(input: &ir::Input) -> TokenStream {
+    let name_str = input.name.to_string();
+    let doc = &input.doc;
+    let meta_fields = input.fields.iter().map(|f| {
+        let name = f.name.to_string();
+        let doc =  &f.doc;
+        let kind = match &f.kind {
+            FieldKind::Child => {
+                let ty = &f.ty;
+                quote! {
+                    confique::meta::FieldKind::Child { meta: &<#ty as confique::Config>::META }
+                }
+            }
+            FieldKind::Leaf { default } => {
+                let default_value = gen_meta_default(default, &f.ty);
+                quote! {
+                    confique::meta::FieldKind::Leaf { default: #default_value }
+                }
+            }
+        };
+
+        quote! {
+            confique::meta::Field {
+                name: #name,
+                doc: &[ #(#doc),* ],
+                kind: #kind,
+            }
+        }
+    });
+
+    quote! {
+        const META: confique::meta::Meta = confique::meta::Meta {
+            name: #name_str,
+            doc: &[ #(#doc),* ],
+            fields: &[ #( #meta_fields ),* ],
+        };
+    }
+}
+
+/// Generates the meta expression of type `meta::Expr` to be used for the
+/// `default` field.
+fn gen_meta_default(default: &Option<Expr>, ty: &syn::Type) -> TokenStream {
+    fn int_type_to_variant(suffix: &str) -> Option<&'static str> {
+        match suffix {
+            "u8" => Some("U8"),
+            "u16" => Some("U16"),
+            "u32" => Some("U32"),
+            "u64" => Some("U64"),
+            "u128" => Some("U128"),
+            "usize" => Some("Usize"),
+            "i8" => Some("I8"),
+            "i16" => Some("I16"),
+            "i32" => Some("I32"),
+            "i64" => Some("I64"),
+            "i128" => Some("I128"),
+            "isize" => Some("Isize"),
+            _ => None,
+        }
+    }
+
+    fn float_type_to_variant(suffix: &str) -> Option<&'static str> {
+        match suffix {
+            "f32" => Some("F32"),
+            "f64" => Some("F64"),
+            _ => None,
+        }
+    }
+
+    // To figure out the type of int or float literals, we first look at the
+    // type suffix of the literal. If it is specified, we use that. Otherwise
+    // we check if the field type is a known float/integer type. If so, we use
+    // that. Otherwise we use a default.
+    fn infer_type(
+        suffix: &str,
+        field_ty: &syn::Type,
+        default: &str,
+        map: fn(&str) -> Option<&'static str>,
+    ) -> Ident {
+        let variant = int_type_to_variant(suffix)
+            .or_else(|| {
+                if let syn::Type::Path(syn::TypePath { qself: None, path }) = field_ty {
+                    path.get_ident().and_then(|i| map(&i.to_string()))
+                } else {
+                    None
+                }
+            })
+            .unwrap_or(default);
+
+        Ident::new(variant, Span::call_site())
+    }
+
+
+    if let Some(default) = default {
+        let v = match default {
+            Expr::Bool(v) => quote! { confique::meta::Expr::Bool(#v) },
+            Expr::Str(s) => quote! { confique::meta::Expr::Str(#s) },
+            Expr::Int(i) => {
+                let variant = infer_type(i.suffix(), ty, "I32", int_type_to_variant);
+                quote! { confique::meta::Expr::Integer(confique::meta::Integer::#variant(#i)) }
+            }
+            Expr::Float(f) => {
+                let variant = infer_type(f.suffix(), ty, "F64", float_type_to_variant);
+                quote! { confique::meta::Expr::Float(confique::meta::Float::#variant(#f)) }
+            }
+        };
+
+        quote! { Some(#v) }
+    } else {
+        quote! { None }
+    }
+}
 
 /// Checks if the given type is an `Option` and if so, return the inner type.
 ///
