@@ -19,8 +19,9 @@ pub struct Meta {
 #[derive(Clone, Copy, Debug)]
 pub struct Field {
     pub name: &'static str,
-    pub kind: FieldKind,
     pub doc: &'static [&'static str],
+    pub optional: bool,
+    pub kind: FieldKind,
 }
 
 #[derive(Clone, Copy, Debug)]

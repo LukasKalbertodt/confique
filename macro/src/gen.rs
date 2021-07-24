@@ -180,10 +180,12 @@ fn gen_meta(input: &ir::Input) -> TokenStream {
             }
         };
 
+        let is_optional = unwrap_option(&f.ty).is_some();
         quote! {
             confique::meta::Field {
                 name: #name,
                 doc: &[ #(#doc),* ],
+                optional: #is_optional,
                 kind: #kind,
             }
         }
