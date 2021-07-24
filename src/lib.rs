@@ -90,7 +90,7 @@ pub trait Partial: for<'de> Deserialize<'de> {
     fn with_fallback(self, fallback: Self) -> Self;
 }
 
-/// A source of configuration values for the configuration object `T`, e.g. a
+/// A source of configuration values for the configuration object `C`, e.g. a
 /// file or environment variables.
 pub trait Source<C: Config> {
     /// Attempts to load a potentially partially configuration object.

@@ -333,6 +333,11 @@ fn inner_visibility(outer: &syn::Visibility) -> TokenStream {
         // The inherited one is relative to the parent module.
         syn::Visibility::Inherited => quote! { pub(super) },
 
+        // For `pub(crate)`
+        syn::Visibility::Restricted(r) if r.path.is_ident("crate") && r.in_token.is_none() => {
+            quote! { pub(crate) }
+        },
+
         // If the path in the `pub(in <path>)` visibility is absolute, we can
         // use it like that as well.
         syn::Visibility::Restricted(r) if r.path.leading_colon.is_some() => quote! { outer },
