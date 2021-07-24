@@ -107,7 +107,7 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
                     Some(confique::internal::deserialize_default(#default).expect(#msg))
                 }
             }
-            FieldKind::Child => {
+            FieldKind::Nested => {
                 if unwrap_option(&f.ty).is_some() {
                     quote! { Some(confique::Partial::default_values()) }
                 } else {
@@ -166,10 +166,10 @@ fn gen_meta(input: &ir::Input) -> TokenStream {
         let name = f.name.to_string();
         let doc =  &f.doc;
         let kind = match &f.kind {
-            FieldKind::Child => {
+            FieldKind::Nested => {
                 let ty = &f.ty;
                 quote! {
-                    confique::meta::FieldKind::Child { meta: &<#ty as confique::Config>::META }
+                    confique::meta::FieldKind::Nested { meta: &<#ty as confique::Config>::META }
                 }
             }
             FieldKind::Leaf { default } => {

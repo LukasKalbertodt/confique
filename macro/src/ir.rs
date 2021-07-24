@@ -30,7 +30,7 @@ pub(crate) enum FieldKind {
     Leaf {
         default: Option<Expr>,
     },
-    Child,
+    Nested,
 }
 
 /// The kinds of expressions (just literals) we allow for default or example
@@ -75,15 +75,15 @@ impl Field {
         let attrs = extract_internal_attrs(&mut field.attrs)?;
 
         // TODO: check no other attributes are here
-        let kind = if attrs.child {
+        let kind = if attrs.nested {
             if attrs.default.is_some() {
                 return Err(Error::new(
                     field.ident.span(),
-                    "cannot specify `child` and `default` attributes at the same time",
+                    "cannot specify `nested` and `default` attributes at the same time",
                 ));
             }
 
-            FieldKind::Child
+            FieldKind::Nested
         } else {
             FieldKind::Leaf {
                 default: attrs.default,
@@ -186,9 +186,9 @@ fn extract_internal_attrs(
                 duplicate_if!(out.default.is_some());
                 out.default = Some(expr);
             }
-            InternalAttr::Child => {
-                duplicate_if!(out.child);
-                out.child = true;
+            InternalAttr::Nested => {
+                duplicate_if!(out.nested);
+                out.nested = true;
             }
         }
     }
@@ -198,19 +198,19 @@ fn extract_internal_attrs(
 
 #[derive(Default)]
 struct InternalAttrs {
-    child: bool,
+    nested: bool,
     default: Option<Expr>,
 }
 
 enum InternalAttr {
-    Child,
+    Nested,
     Default(Expr),
 }
 
 impl InternalAttr {
     fn keyword(&self) -> &'static str {
         match self {
-            Self::Child => "child",
+            Self::Nested => "nested",
             Self::Default(_) => "default",
         }
     }
@@ -220,9 +220,9 @@ impl Parse for InternalAttr {
     fn parse(input: ParseStream) -> Result<Self, syn::Error> {
         let ident: syn::Ident = input.parse()?;
         match &*ident.to_string() {
-            "child" => {
+            "nested" => {
                 assert_empty(input)?;
-                Ok(Self::Child)
+                Ok(Self::Nested)
             }
             "default" => {
                 let _: Token![=] = input.parse()?;

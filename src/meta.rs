@@ -28,7 +28,7 @@ pub enum FieldKind {
     Leaf {
         default: Option<Expr>,
     },
-    Child {
+    Nested {
         meta: &'static Meta,
     },
 }

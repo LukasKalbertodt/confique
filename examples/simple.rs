@@ -3,10 +3,10 @@ use confique::Config;
 
 #[derive(Debug, Config)]
 struct Conf {
-    #[config(child)]
+    #[config(nested)]
     http: Http,
 
-    #[config(child)]
+    #[config(nested)]
     cat: Cat,
 }
 
