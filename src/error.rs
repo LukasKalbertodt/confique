@@ -1,4 +1,4 @@
-use std::{ffi::OsString, fmt, path::PathBuf};
+use std::{fmt, path::PathBuf};
 
 
 /// Type describing all errors that can occur in this library.
@@ -33,12 +33,16 @@ pub(crate) enum ErrorInner {
     /// feature of confique was not enabled.
     UnsupportedFileFormat {
         path: PathBuf,
-        extension: OsString,
     },
 
     /// Returned by the [`Source`] impls for `Path` and `PathBuf` if the path
     /// does not contain a file extension.
     MissingFileExtension {
+        path: PathBuf,
+    },
+
+    /// A file source was marked as required but the file does not exist.
+    MissingRequiredFile {
         path: PathBuf,
     }
 }
@@ -50,7 +54,8 @@ impl std::error::Error for Error {
             ErrorInner::Deserialization { err, .. } => Some(&**err),
             ErrorInner::MissingValue(_)
             | ErrorInner::UnsupportedFileFormat { .. }
-            | ErrorInner::MissingFileExtension { .. } => None,
+            | ErrorInner::MissingFileExtension { .. }
+            | ErrorInner::MissingRequiredFile { .. } => None,
         }
     }
 }
@@ -76,16 +81,21 @@ impl fmt::Display for Error {
             ErrorInner::Deserialization { source: None, .. } => {
                 std::write!(f, "failed to deserialize configuration")
             }
-            ErrorInner::UnsupportedFileFormat { path, extension } => {
+            ErrorInner::UnsupportedFileFormat { path } => {
                 std::write!(f,
-                    "unknown configuration file format '{}' of '{}'",
-                    extension.to_string_lossy(),
+                    "unknown configuration file format/extension: '{}'",
                     path.display(),
                 )
             }
             ErrorInner::MissingFileExtension { path } => {
                 std::write!(f,
                     "cannot guess configuration file format due to missing file extension in '{}'",
+                    path.display(),
+                )
+            }
+            ErrorInner::MissingRequiredFile { path } => {
+                std::write!(f,
+                    "required configuration file does not exist: '{}'",
                     path.display(),
                 )
             }

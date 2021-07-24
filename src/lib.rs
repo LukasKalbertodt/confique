@@ -55,21 +55,6 @@ pub trait Config: Sized {
     /// If any required values are not defined in `partial`, an [`Error`] is
     /// returned.
     fn from_partial(partial: Self::Partial) -> Result<Self, Error>;
-
-    /// Tries to load configuration values from all given sources, merging all
-    /// layers and returning the result. Sources earlier in the given slice have
-    /// a higher priority.
-    ///
-    /// TODO: example
-    fn from_sources(sources: &[&dyn Source<Self>]) -> Result<Self, Error> {
-        let mut partial = Self::Partial::default_values();
-        for src in sources.iter().rev() {
-            let layer = src.load()?;
-            partial = layer.with_fallback(partial);
-        }
-
-        Self::from_partial(partial)
-    }
 }
 
 /// A potentially partial configuration object that can be directly deserialized
@@ -88,11 +73,4 @@ pub trait Partial: for<'de> Deserialize<'de> {
     /// if they exist. The semantics of this method is basically like in
     /// [`Option::or`].
     fn with_fallback(self, fallback: Self) -> Self;
-}
-
-/// A source of configuration values for the configuration object `C`, e.g. a
-/// file or environment variables.
-pub trait Source<C: Config> {
-    /// Attempts to load a potentially partially configuration object.
-    fn load(&self) -> Result<C::Partial, Error>;
 }

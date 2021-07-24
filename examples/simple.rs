@@ -1,4 +1,4 @@
-use std::{net::IpAddr, path::{Path, PathBuf}};
+use std::{net::IpAddr, path::PathBuf};
 use confique::{Config, toml::FormatOptions};
 
 #[derive(Debug, Config)]
@@ -41,13 +41,13 @@ fn main() -> Result<(), anyhow::Error> {
     print!("{}", confique::toml::format::<Conf>(FormatOptions::default()));
     println!("--------------------------------------------------------");
 
-    let r = Conf::from_sources(&[
-        &Path::new("examples/files/simple.toml"),
-        &Path::new("examples/files/etc/simple.yaml"),
-    ])?;
+    // let r = Conf::from_sources(&[
+    //     &Path::new("examples/files/simple.toml"),
+    //     &Path::new("examples/files/etc/simple.yaml"),
+    // ])?;
 
-    println!();
-    println!("LOADED CONFIGURATION: {:#?}", r);
+    // println!();
+    // println!("LOADED CONFIGURATION: {:#?}", r);
 
     Ok(())
 }
