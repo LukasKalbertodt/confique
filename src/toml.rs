@@ -13,12 +13,22 @@ pub struct FormatOptions {
 
     /// Indentation if nested tables. Default: 0.
     pub indent: u8,
+
+    /// Whether to include doc comments (with your own text and information
+    /// about whether a value is required and/or has a default). Default:
+    /// true.
+    pub comments: bool,
+
+    // Potential future options:
+    // - Comment out default values (`#foo = 3` vs `foo = 3`)
+    // - Which docs to include from nested objects
 }
 
 impl Default for FormatOptions {
     fn default() -> Self {
         Self {
             indent: 0,
+            comments: true,
         }
     }
 }
@@ -82,11 +92,13 @@ pub fn format<C: Config>(options: FormatOptions) -> String {
     let meta = &C::META;
 
     // Print root docs.
-    for doc in meta.doc {
-        writeln!(out, "#{}", doc).unwrap();
-    }
-    if !meta.doc.is_empty() {
-        add_empty_line(&mut out);
+    if options.comments {
+        for doc in meta.doc {
+            writeln!(out, "#{}", doc).unwrap();
+        }
+        if !meta.doc.is_empty() {
+            add_empty_line(&mut out);
+        }
     }
 
     // Recursively format all nested objects and fields
@@ -117,30 +129,35 @@ fn format_impl(
     }
 
     if !path.is_empty() {
+        add_empty_line(s);
         emit!("[{}]", path.join("."));
     }
 
     for field in meta.fields {
-        for doc in field.doc {
-            emit!("#{}", doc);
+        if options.comments {
+            for doc in field.doc {
+                emit!("#{}", doc);
+            }
         }
 
         match &field.kind {
             FieldKind::Leaf { default } => {
                 // Emit comment about default value or the value being required
-                match default {
-                    Some(v) => {
-                        if !field.doc.is_empty() {
-                            emit!("#");
-                        }
-                        emit!("# Default value: {}", PrintExpr(v));
-                    }
-                    None => {
-                        if !field.optional {
+                if options.comments {
+                    match default {
+                        Some(v) => {
                             if !field.doc.is_empty() {
                                 emit!("#");
                             }
-                            emit!("# Required! This value must be specified.");
+                            emit!("# Default value: {}", PrintExpr(v));
+                        }
+                        None => {
+                            if !field.optional {
+                                if !field.doc.is_empty() {
+                                    emit!("#");
+                                }
+                                emit!("# Required! This value must be specified.");
+                            }
                         }
                     }
                 }
@@ -158,14 +175,18 @@ fn format_impl(
             }
         }
 
-        add_empty_line(s);
+        if options.comments {
+            add_empty_line(s);
+        }
     }
 }
 
 /// Adds zero, one or two line breaks to make sure that there are at least two
-/// line breaks at the end of the string.
+/// line breaks at the end of the string. Except if the buffer is completely
+/// empty, in which case it is not modified.
 fn add_empty_line(out: &mut String) {
     match () {
+        () if out.is_empty() => {},
         () if out.ends_with("\n\n") => {},
         () if out.ends_with('\n') => out.push('\n'),
         _ => out.push_str("\n\n"),
