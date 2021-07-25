@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use serde::Deserialize;
 
 #[doc(hidden)]
@@ -67,6 +69,27 @@ pub trait Config: Sized {
     /// TODO: Example
     fn builder() -> Builder<Self> {
         Builder::new()
+    }
+
+    /// Load the configuration from a single file.
+    ///
+    /// If you rather want to load from multiple sources, use
+    /// [`Config::builder`]. Infers the file format from the file extension.
+    /// Returns an error in these cases:
+    ///
+    /// - The path does not have a known file extension.
+    /// - Loading the file fails.
+    /// - The file does not specify all required configuration values.
+    ///
+    /// TODO: Example
+    fn from_file(path: impl Into<PathBuf>) -> Result<Self, Error> {
+        let default_values = Self::Partial::default_values();
+        let mut file = File::new(path)?;
+        if !default_values.is_complete() {
+            file = file.required();
+        }
+
+        Self::from_partial(file.load::<Self::Partial>()?.with_fallback(default_values))
     }
 }
 
