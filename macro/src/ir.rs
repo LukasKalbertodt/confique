@@ -2,6 +2,8 @@
 
 use syn::{Error, Token, parse::{Parse, ParseStream}, spanned::Spanned};
 
+use crate::util::{is_option, unwrap_option};
+
 
 /// The parsed input to the `gen_config` macro.
 #[derive(Debug)]
@@ -16,7 +18,6 @@ pub(crate) struct Input {
 pub(crate) struct Field {
     pub(crate) doc: Vec<String>,
     pub(crate) name: syn::Ident,
-    pub(crate) ty: syn::Type,
     pub(crate) kind: FieldKind,
 
     // TODO:
@@ -27,10 +28,21 @@ pub(crate) struct Field {
 
 #[derive(Debug)]
 pub(crate) enum FieldKind {
-    Leaf {
+    /// A non-optional leaf. `ty` is not `Option<_>`.
+    RequiredLeaf {
         default: Option<Expr>,
+        ty: syn::Type,
     },
-    Nested,
+
+    /// A leaf with type `Option<_>`.
+    OptionalLeaf {
+        inner_ty: syn::Type,
+    },
+
+    /// A nested configuration. The type is never `Option<_>`.
+    Nested {
+        ty: syn::Type,
+    },
 }
 
 /// The kinds of expressions (just literals) we allow for default or example
@@ -76,6 +88,12 @@ impl Field {
 
         // TODO: check no other attributes are here
         let kind = if attrs.nested {
+            if is_option(&field.ty) {
+                return Err(Error::new(
+                    field.ident.span(),
+                    "nested configurations cannot be optional (type `Option<_>`)",
+                ));
+            }
             if attrs.default.is_some() {
                 return Err(Error::new(
                     field.ident.span(),
@@ -83,23 +101,33 @@ impl Field {
                 ));
             }
 
-            FieldKind::Nested
+            FieldKind::Nested { ty: field.ty }
         } else {
-            FieldKind::Leaf {
-                default: attrs.default,
+            match unwrap_option(&field.ty) {
+                None => FieldKind::RequiredLeaf { default: attrs.default, ty: field.ty },
+                Some(inner) => {
+                    if attrs.default.is_some() {
+                        return Err(Error::new(
+                            field.ident.span(),
+                            "optional fields (type `Option<_>`) cannot have default \
+                                values (`#[config(default = ...)]`)",
+                        ));
+                    }
+
+                    FieldKind::OptionalLeaf { inner_ty: inner.clone() }
+                }
             }
         };
 
         Ok(Self {
             doc,
             name: field.ident.expect("bug: expected named field"),
-            ty: field.ty,
             kind,
         })
     }
 
     pub(crate) fn is_leaf(&self) -> bool {
-        matches!(self.kind, FieldKind::Leaf { .. })
+        matches!(self.kind, FieldKind::RequiredLeaf { .. } | FieldKind::OptionalLeaf { .. })
     }
 }
 

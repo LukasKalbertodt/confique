@@ -23,18 +23,23 @@ fn gen_config_impl(input: &ir::Input) -> TokenStream {
     let from_exprs = input.fields.iter().map(|f| {
         let field_name = &f.name;
         let path = field_name.to_string();
-        if !f.is_leaf() {
-            quote! {
-                confique::Config::from_partial(partial.#field_name).map_err(|e| {
-                    confique::internal::prepend_missing_value_error(e, #path)
-                })?
+        match f.kind {
+            FieldKind::Nested { .. } => {
+                quote! {
+                    confique::Config::from_partial(partial.#field_name).map_err(|e| {
+                        confique::internal::prepend_missing_value_error(e, #path)
+                    })?
+                }
             }
-        } else if !is_option(&f.ty) {
-            quote! {
-                partial.#field_name.ok_or(confique::internal::missing_value_error(#path.into()))?
+            FieldKind::OptionalLeaf { .. } => {
+                quote! { partial.#field_name }
             }
-        } else {
-            quote! { partial.#field_name }
+            FieldKind::RequiredLeaf { .. } => {
+                quote! {
+                    partial.#field_name
+                        .ok_or(confique::internal::missing_value_error(#path.into()))?
+                }
+            }
         }
     });
 
@@ -69,23 +74,22 @@ fn partial_names(original_name: &Ident) -> (Ident, Ident) {
 fn gen_partial_mod(input: &ir::Input) -> TokenStream {
     let (mod_name, struct_name) = partial_names(&input.name);
     let visibility = &input.visibility;
-    let inner_visibility = inner_visibility(&input.visibility);
+    let inner_vis = inner_visibility(&input.visibility);
 
     // Prepare some tokens per field.
     let field_names = input.fields.iter().map(|f| &f.name).collect::<Vec<_>>();
     let struct_fields = input.fields.iter().map(|f| {
         let name = &f.name;
-        if f.is_leaf() {
-            let inner = unwrap_option(&f.ty).unwrap_or(&f.ty);
-            quote! { #inner_visibility #name: Option<#inner>, }
-        } else {
-            let ty = &f.ty;
-            quote! {
+        match &f.kind {
+            FieldKind::RequiredLeaf { ty, .. } => quote! { #inner_vis #name: Option<#ty> },
+            FieldKind::OptionalLeaf { inner_ty } => quote! { #inner_vis #name: Option<#inner_ty> },
+            FieldKind::Nested { ty } => quote! {
                 #[serde(default = "confique::Partial::empty")]
-                #inner_visibility #name: <#ty as confique::Config>::Partial,
-            }
+                #inner_vis #name: <#ty as confique::Config>::Partial
+            },
         }
     });
+
     let empty_values = input.fields.iter().map(|f| {
         if f.is_leaf() {
             quote! { None }
@@ -93,10 +97,13 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
             quote! { confique::Partial::empty() }
         }
     });
+
     let defaults = input.fields.iter().map(|f| {
         match &f.kind {
-            FieldKind::Leaf { default: None } => quote! { None },
-            FieldKind::Leaf { default: Some(default) } => {
+            FieldKind::RequiredLeaf { default: None, .. } | FieldKind::OptionalLeaf { .. } => {
+                quote! { None }
+            }
+            FieldKind::RequiredLeaf { default: Some(default), .. } => {
                 let msg = format!(
                     "default config value for `{}::{}` cannot be deserialized",
                     input.name,
@@ -107,15 +114,10 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
                     Some(confique::internal::deserialize_default(#default).expect(#msg))
                 }
             }
-            FieldKind::Nested => {
-                if is_option(&f.ty) {
-                    quote! { Some(confique::Partial::default_values()) }
-                } else {
-                    quote! { confique::Partial::default_values() }
-                }
-            }
+            FieldKind::Nested { .. } => quote! { confique::Partial::default_values() },
         }
     });
+
     let fallbacks= input.fields.iter().map(|f| {
         let name = &f.name;
         if f.is_leaf() {
@@ -124,24 +126,22 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
             quote! { self.#name.with_fallback(fallback.#name) }
         }
     });
+
     let is_empty_exprs = input.fields.iter().map(|f| {
         let name = &f.name;
-        match f.kind {
-            FieldKind::Leaf { .. } => quote! { self.#name.is_none() },
-            FieldKind::Nested => quote! { self.#name.is_empty() },
+        if f.is_leaf() {
+            quote! { self.#name.is_none() }
+        } else {
+            quote! { self.#name.is_empty() }
         }
     });
+
     let is_complete_expr = input.fields.iter().map(|f| {
         let name = &f.name;
         match f.kind {
-            FieldKind::Leaf { .. } => {
-                if is_option(&f.ty) {
-                    quote! { true }
-                } else {
-                    quote! { self.#name.is_some() }
-                }
-            }
-            FieldKind::Nested => quote! { self.#name.is_complete() },
+            FieldKind::OptionalLeaf { .. } => quote! { true },
+            FieldKind::RequiredLeaf { .. } => quote! { self.#name.is_some() },
+            FieldKind::Nested { .. } => quote! { self.#name.is_complete() },
         }
     });
 
@@ -150,8 +150,8 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
             use super::*;
 
             #[derive(confique::serde::Deserialize)]
-            #inner_visibility struct #struct_name {
-                #( #struct_fields )*
+            #inner_vis struct #struct_name {
+                #( #struct_fields, )*
             }
 
             impl confique::Partial for #struct_name {
@@ -194,26 +194,28 @@ fn gen_meta(input: &ir::Input) -> TokenStream {
         let name = f.name.to_string();
         let doc =  &f.doc;
         let kind = match &f.kind {
-            FieldKind::Nested => {
-                let ty = &f.ty;
+            FieldKind::Nested { ty }=> {
                 quote! {
                     confique::meta::FieldKind::Nested { meta: &<#ty as confique::Config>::META }
                 }
             }
-            FieldKind::Leaf { default } => {
-                let default_value = gen_meta_default(default, &f.ty);
+            FieldKind::OptionalLeaf { .. } => {
                 quote! {
-                    confique::meta::FieldKind::Leaf { default: #default_value }
+                    confique::meta::FieldKind::OptionalLeaf
+                }
+            }
+            FieldKind::RequiredLeaf { default, ty } => {
+                let default_value = gen_meta_default(default, &ty);
+                quote! {
+                    confique::meta::FieldKind::RequiredLeaf { default: #default_value }
                 }
             }
         };
 
-        let is_optional = is_option(&f.ty);
         quote! {
             confique::meta::Field {
                 name: #name,
                 doc: &[ #(#doc),* ],
-                optional: #is_optional,
                 kind: #kind,
             }
         }
@@ -299,52 +301,6 @@ fn gen_meta_default(default: &Option<Expr>, ty: &syn::Type) -> TokenStream {
     } else {
         quote! { None }
     }
-}
-
-/// Checks if the given type is an `Option` and if so, return the inner type.
-///
-/// Note: this function clearly shows one of the major shortcomings of proc
-/// macros right now: we do not have access to the compiler's type tables and
-/// can only check if it "looks" like an `Option`. Of course, stuff can go
-/// wrong. But that's the best we can do and it's highly unlikely that someone
-/// shadows `Option`.
-fn unwrap_option(ty: &syn::Type) -> Option<&syn::Type> {
-    let ty = match ty {
-        syn::Type::Path(path) => path,
-        _ => return None,
-    };
-
-    if ty.qself.is_some() || ty.path.leading_colon.is_some() {
-        return None;
-    }
-
-    let valid_paths = [
-        &["Option"] as &[_],
-        &["std", "option", "Option"],
-        &["core", "option", "Option"],
-    ];
-    if !valid_paths.iter().any(|vp| ty.path.segments.iter().map(|s| &s.ident).eq(*vp)) {
-        return None;
-    }
-
-    let args = match &ty.path.segments.last().unwrap().arguments {
-        syn::PathArguments::AngleBracketed(args) => args,
-        _ => return None,
-    };
-
-    if args.args.len() != 1 {
-        return None;
-    }
-
-    match &args.args[0] {
-        syn::GenericArgument::Type(t) => Some(t),
-        _ => None,
-    }
-}
-
-/// Returns `true` if the given type is `Option<_>`.
-fn is_option(ty: &syn::Type) -> bool {
-    unwrap_option(ty).is_some()
 }
 
 impl ToTokens for ir::Expr {

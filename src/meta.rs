@@ -22,15 +22,15 @@ pub struct Meta {
 pub struct Field {
     pub name: &'static str,
     pub doc: &'static [&'static str],
-    pub optional: bool,
     pub kind: FieldKind,
 }
 
 #[derive(Clone, Copy, Debug)]
 pub enum FieldKind {
-    Leaf {
+    RequiredLeaf {
         default: Option<Expr>,
     },
+    OptionalLeaf,
     Nested {
         meta: &'static Meta,
     },

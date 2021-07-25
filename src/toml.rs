@@ -141,24 +141,19 @@ fn format_impl(
         }
 
         match &field.kind {
-            FieldKind::Leaf { default } => {
+            FieldKind::RequiredLeaf { default } => {
                 // Emit comment about default value or the value being required
                 if options.comments {
-                    match default {
-                        Some(v) => {
-                            if !field.doc.is_empty() {
-                                emit!("#");
-                            }
-                            emit!("# Default value: {}", PrintExpr(v));
+                    if let Some(v) = default {
+                        if !field.doc.is_empty() {
+                            emit!("#");
                         }
-                        None => {
-                            if !field.optional {
-                                if !field.doc.is_empty() {
-                                    emit!("#");
-                                }
-                                emit!("# Required! This value must be specified.");
-                            }
+                        emit!("# Default value: {}", PrintExpr(v));
+                    } else {
+                        if !field.doc.is_empty() {
+                            emit!("#");
                         }
+                        emit!("# Required! This value must be specified.");
                     }
                 }
 
@@ -168,6 +163,8 @@ fn format_impl(
                     None => emit!("#{} =", field.name),
                 }
             }
+
+            FieldKind::OptionalLeaf => emit!("#{} =", field.name),
 
             FieldKind::Nested { meta } => {
                 let child_path = path.iter().copied().chain([field.name]).collect();
