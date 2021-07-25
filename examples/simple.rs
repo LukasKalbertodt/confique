@@ -41,13 +41,13 @@ fn main() -> Result<(), anyhow::Error> {
     print!("{}", confique::toml::format::<Conf>(FormatOptions::default()));
     println!("--------------------------------------------------------");
 
-    // let r = Conf::from_sources(&[
-    //     &Path::new("examples/files/simple.toml"),
-    //     &Path::new("examples/files/etc/simple.yaml"),
-    // ])?;
+    let r = Conf::builder()
+        .file("examples/files/simple.toml")
+        .file("examples/files/etc/simple.yaml")
+        .load()?;
 
-    // println!();
-    // println!("LOADED CONFIGURATION: {:#?}", r);
+    println!();
+    println!("LOADED CONFIGURATION: {:#?}", r);
 
     Ok(())
 }

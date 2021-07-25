@@ -14,7 +14,7 @@ pub struct File {
 }
 
 impl File {
-    /// Configuration file with the given path. The format is inferred by the
+    /// Configuration file with the given path. The format is inferred from the
     /// file extension. If the path does not have an extension or it is
     /// unknown, an error is returned.
     pub fn new(path: impl Into<PathBuf>) -> Result<Self, Error> {

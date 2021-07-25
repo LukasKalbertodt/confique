@@ -3,6 +3,7 @@ use serde::Deserialize;
 #[doc(hidden)]
 pub mod internal;
 
+mod builder;
 mod error;
 mod file;
 pub mod meta;
@@ -14,6 +15,7 @@ pub mod toml;
 pub use serde;
 pub use confique_macro::Config;
 pub use self::{
+    builder::Builder,
     error::Error,
     file::{File, FileFormat},
 };
@@ -55,6 +57,17 @@ pub trait Config: Sized {
     /// If any required values are not defined in `partial`, an [`Error`] is
     /// returned.
     fn from_partial(partial: Self::Partial) -> Result<Self, Error>;
+
+    /// Convenience builder to configure, load and merge multiple configuration
+    /// sources. **Sources specified earlier have a higher priority**; later
+    /// sources only fill in the gaps. After all sources have been loaded, the
+    /// default values (usually specified with `#[default = ...]`) are merged
+    /// (with the lowest priority).
+    ///
+    /// TODO: Example
+    fn builder() -> Builder<Self> {
+        Builder::new()
+    }
 }
 
 /// A potentially partial configuration object that can be directly deserialized
