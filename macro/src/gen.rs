@@ -29,7 +29,7 @@ fn gen_config_impl(input: &ir::Input) -> TokenStream {
                     confique::internal::prepend_missing_value_error(e, #path)
                 })?
             }
-        } else if unwrap_option(&f.ty).is_none() {
+        } else if !is_option(&f.ty) {
             quote! {
                 partial.#field_name.ok_or(confique::internal::missing_value_error(#path.into()))?
             }
@@ -108,7 +108,7 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
                 }
             }
             FieldKind::Nested => {
-                if unwrap_option(&f.ty).is_some() {
+                if is_option(&f.ty) {
                     quote! { Some(confique::Partial::default_values()) }
                 } else {
                     quote! { confique::Partial::default_values() }
@@ -122,6 +122,26 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
             quote! { self.#name.or(fallback.#name) }
         } else {
             quote! { self.#name.with_fallback(fallback.#name) }
+        }
+    });
+    let is_empty_exprs = input.fields.iter().map(|f| {
+        let name = &f.name;
+        match f.kind {
+            FieldKind::Leaf { .. } => quote! { self.#name.is_none() },
+            FieldKind::Nested => quote! { self.#name.is_empty() },
+        }
+    });
+    let is_complete_expr = input.fields.iter().map(|f| {
+        let name = &f.name;
+        match f.kind {
+            FieldKind::Leaf { .. } => {
+                if is_option(&f.ty) {
+                    quote! { true }
+                } else {
+                    quote! { self.#name.is_some() }
+                }
+            }
+            FieldKind::Nested => quote! { self.#name.is_complete() },
         }
     });
 
@@ -152,6 +172,14 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
                         #( #field_names: #fallbacks, )*
                     }
                 }
+
+                fn is_empty(&self) -> bool {
+                    true #(&& #is_empty_exprs)*
+                }
+
+                fn is_complete(&self) -> bool {
+                    true #(&& #is_complete_expr)*
+                }
             }
         }
     }
@@ -180,7 +208,7 @@ fn gen_meta(input: &ir::Input) -> TokenStream {
             }
         };
 
-        let is_optional = unwrap_option(&f.ty).is_some();
+        let is_optional = is_option(&f.ty);
         quote! {
             confique::meta::Field {
                 name: #name,
@@ -312,6 +340,11 @@ fn unwrap_option(ty: &syn::Type) -> Option<&syn::Type> {
         syn::GenericArgument::Type(t) => Some(t),
         _ => None,
     }
+}
+
+/// Returns `true` if the given type is `Option<_>`.
+fn is_option(ty: &syn::Type) -> bool {
+    unwrap_option(ty).is_some()
 }
 
 impl ToTokens for ir::Expr {

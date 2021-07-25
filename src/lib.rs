@@ -86,4 +86,12 @@ pub trait Partial: for<'de> Deserialize<'de> {
     /// if they exist. The semantics of this method is basically like in
     /// [`Option::or`].
     fn with_fallback(self, fallback: Self) -> Self;
+
+    /// Returns `true` if all values are unspecified/`None`.
+    fn is_empty(&self) -> bool;
+
+    /// Returns `true` if all required (non-optional) values in this
+    /// configuration are set. If this returns `true`, `Config::from_partial`
+    /// will not return an error.
+    fn is_complete(&self) -> bool;
 }
