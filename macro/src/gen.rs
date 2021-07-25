@@ -2,7 +2,7 @@ use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, format_ident, quote};
 use syn::Ident;
 
-use crate::ir::{self, Expr, FieldKind};
+use crate::ir::{self, Expr, FieldKind, LeafKind};
 
 
 pub(crate) fn gen(input: ir::Input) -> TokenStream {
@@ -31,10 +31,10 @@ fn gen_config_impl(input: &ir::Input) -> TokenStream {
                     })?
                 }
             }
-            FieldKind::OptionalLeaf { .. } => {
+            FieldKind::Leaf { kind: LeafKind::Optional { .. }, .. } => {
                 quote! { partial.#field_name }
             }
-            FieldKind::RequiredLeaf { .. } => {
+            FieldKind::Leaf { kind: LeafKind::Required { .. }, .. } => {
                 quote! {
                     partial.#field_name
                         .ok_or(confique::internal::missing_value_error(#path.into()))?
@@ -81,8 +81,12 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
     let struct_fields = input.fields.iter().map(|f| {
         let name = &f.name;
         match &f.kind {
-            FieldKind::RequiredLeaf { ty, .. } => quote! { #inner_vis #name: Option<#ty> },
-            FieldKind::OptionalLeaf { inner_ty } => quote! { #inner_vis #name: Option<#inner_ty> },
+            FieldKind::Leaf { kind: LeafKind::Required { ty, .. }, .. } => quote! {
+                #inner_vis #name: Option<#ty>
+            },
+            FieldKind::Leaf { kind: LeafKind::Optional { inner_ty }, .. } => quote! {
+                #inner_vis #name: Option<#inner_ty>
+            },
             FieldKind::Nested { ty } => quote! {
                 #[serde(default = "confique::Partial::empty")]
                 #inner_vis #name: <#ty as confique::Config>::Partial
@@ -100,10 +104,7 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
 
     let defaults = input.fields.iter().map(|f| {
         match &f.kind {
-            FieldKind::RequiredLeaf { default: None, .. } | FieldKind::OptionalLeaf { .. } => {
-                quote! { None }
-            }
-            FieldKind::RequiredLeaf { default: Some(default), .. } => {
+            FieldKind::Leaf { kind: LeafKind::Required { default: Some(default), .. }, .. } => {
                 let msg = format!(
                     "default config value for `{}::{}` cannot be deserialized",
                     input.name,
@@ -114,6 +115,7 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
                     Some(confique::internal::deserialize_default(#default).expect(#msg))
                 }
             }
+            FieldKind::Leaf { .. } => quote! { None },
             FieldKind::Nested { .. } => quote! { confique::Partial::default_values() },
         }
     });
@@ -138,9 +140,14 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
 
     let is_complete_expr = input.fields.iter().map(|f| {
         let name = &f.name;
-        match f.kind {
-            FieldKind::OptionalLeaf { .. } => quote! { true },
-            FieldKind::RequiredLeaf { .. } => quote! { self.#name.is_some() },
+        match &f.kind {
+            FieldKind::Leaf { kind, .. } => {
+                if kind.is_required() {
+                    quote! { self.#name.is_some() }
+                } else {
+                    quote! { true }
+                }
+            }
             FieldKind::Nested { .. } => quote! { self.#name.is_complete() },
         }
     });
@@ -188,6 +195,13 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
 
 /// Generates the whole `const META` item.
 fn gen_meta(input: &ir::Input) -> TokenStream {
+    fn env_tokens(env: &Option<String>) -> TokenStream {
+        match env {
+            Some(key) => quote! { Some(#key) },
+            None => quote! { None },
+        }
+    }
+
     let name_str = input.name.to_string();
     let doc = &input.doc;
     let meta_fields = input.fields.iter().map(|f| {
@@ -199,15 +213,25 @@ fn gen_meta(input: &ir::Input) -> TokenStream {
                     confique::meta::FieldKind::Nested { meta: &<#ty as confique::Config>::META }
                 }
             }
-            FieldKind::OptionalLeaf { .. } => {
+            FieldKind::Leaf { env, kind: LeafKind::Optional { .. }} => {
+                let env = env_tokens(env);
                 quote! {
-                    confique::meta::FieldKind::OptionalLeaf
+                    confique::meta::FieldKind::Leaf {
+                        env: #env,
+                        kind: confique::meta::LeafKind::Optional,
+                    }
                 }
             }
-            FieldKind::RequiredLeaf { default, ty } => {
+            FieldKind::Leaf { env, kind: LeafKind::Required { default, ty, .. }} => {
+                let env = env_tokens(env);
                 let default_value = gen_meta_default(default, &ty);
                 quote! {
-                    confique::meta::FieldKind::RequiredLeaf { default: #default_value }
+                    confique::meta::FieldKind::Leaf {
+                        env: #env,
+                        kind: confique::meta::LeafKind::Required {
+                            default: #default_value,
+                        },
+                    }
                 }
             }
         };

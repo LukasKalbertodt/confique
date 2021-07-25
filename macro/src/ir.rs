@@ -28,21 +28,35 @@ pub(crate) struct Field {
 
 #[derive(Debug)]
 pub(crate) enum FieldKind {
-    /// A non-optional leaf. `ty` is not `Option<_>`.
-    RequiredLeaf {
-        default: Option<Expr>,
-        ty: syn::Type,
-    },
-
-    /// A leaf with type `Option<_>`.
-    OptionalLeaf {
-        inner_ty: syn::Type,
+    Leaf {
+        env: Option<String>,
+        kind: LeafKind,
     },
 
     /// A nested configuration. The type is never `Option<_>`.
     Nested {
         ty: syn::Type,
     },
+}
+
+#[derive(Debug)]
+pub(crate) enum LeafKind {
+    /// A non-optional leaf. `ty` is not `Option<_>`.
+    Required {
+        default: Option<Expr>,
+        ty: syn::Type,
+    },
+
+    /// A leaf with type `Option<_>`.
+    Optional {
+        inner_ty: syn::Type,
+    },
+}
+
+impl LeafKind {
+    pub(crate) fn is_required(&self) -> bool {
+        matches!(self, Self::Required { .. })
+    }
 }
 
 /// The kinds of expressions (just literals) we allow for default or example
@@ -100,11 +114,23 @@ impl Field {
                     "cannot specify `nested` and `default` attributes at the same time",
                 ));
             }
+            if attrs.env.is_some() {
+                return Err(Error::new(
+                    field.ident.span(),
+                    "cannot specify `nested` and `env` attributes at the same time",
+                ));
+            }
 
             FieldKind::Nested { ty: field.ty }
         } else {
             match unwrap_option(&field.ty) {
-                None => FieldKind::RequiredLeaf { default: attrs.default, ty: field.ty },
+                None => FieldKind::Leaf {
+                    env: attrs.env,
+                    kind: LeafKind::Required {
+                        default: attrs.default,
+                        ty: field.ty,
+                    },
+                },
                 Some(inner) => {
                     if attrs.default.is_some() {
                         return Err(Error::new(
@@ -114,7 +140,12 @@ impl Field {
                         ));
                     }
 
-                    FieldKind::OptionalLeaf { inner_ty: inner.clone() }
+                    FieldKind::Leaf {
+                        env: attrs.env,
+                        kind: LeafKind::Optional {
+                            inner_ty: inner.clone(),
+                        },
+                    }
                 }
             }
         };
@@ -127,7 +158,7 @@ impl Field {
     }
 
     pub(crate) fn is_leaf(&self) -> bool {
-        matches!(self.kind, FieldKind::RequiredLeaf { .. } | FieldKind::OptionalLeaf { .. })
+        matches!(self.kind, FieldKind::Leaf { .. })
     }
 }
 
@@ -218,6 +249,10 @@ fn extract_internal_attrs(
                 duplicate_if!(out.nested);
                 out.nested = true;
             }
+            InternalAttr::Env(key) => {
+                duplicate_if!(out.env.is_some());
+                out.env = Some(key);
+            }
         }
     }
 
@@ -228,11 +263,13 @@ fn extract_internal_attrs(
 struct InternalAttrs {
     nested: bool,
     default: Option<Expr>,
+    env: Option<String>
 }
 
 enum InternalAttr {
     Nested,
     Default(Expr),
+    Env(String),
 }
 
 impl InternalAttr {
@@ -240,6 +277,7 @@ impl InternalAttr {
         match self {
             Self::Nested => "nested",
             Self::Default(_) => "default",
+            Self::Env(_) => "env",
         }
     }
 }
@@ -252,12 +290,21 @@ impl Parse for InternalAttr {
                 assert_empty(input)?;
                 Ok(Self::Nested)
             }
+
             "default" => {
                 let _: Token![=] = input.parse()?;
                 let expr = Expr::from_lit(input.parse()?)?;
                 assert_empty(input)?;
                 Ok(Self::Default(expr))
             }
+
+            "env" => {
+                let _: Token![=] = input.parse()?;
+                let key: syn::LitStr = input.parse()?;
+                assert_empty(input)?;
+                Ok(Self::Env(key.value()))
+            }
+
             _ => Err(syn::Error::new(ident.span(), "unknown confique attribute")),
         }
     }

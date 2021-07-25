@@ -15,6 +15,7 @@ struct Conf {
 #[derive(Debug, Config)]
 struct Http {
     /// The port the server will listen on.
+    #[config(env = "PORT")]
     port: u16,
 
     /// The bind address of the server. Can be set to `0.0.0.0` for example, to

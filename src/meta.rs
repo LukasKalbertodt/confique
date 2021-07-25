@@ -27,13 +27,21 @@ pub struct Field {
 
 #[derive(Clone, Copy, Debug)]
 pub enum FieldKind {
-    RequiredLeaf {
-        default: Option<Expr>,
+    Leaf {
+        env: Option<&'static str>,
+        kind: LeafKind,
     },
-    OptionalLeaf,
     Nested {
         meta: &'static Meta,
     },
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum LeafKind {
+    Required {
+        default: Option<Expr>,
+    },
+    Optional,
 }
 
 #[derive(Debug, Clone, Copy)]

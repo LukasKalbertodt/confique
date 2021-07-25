@@ -3,7 +3,7 @@
 
 use std::fmt::{self, Write};
 
-use crate::{Config, meta::{Expr, FieldKind, Meta}};
+use crate::{Config, meta::{Expr, FieldKind, LeafKind, Meta}};
 
 
 
@@ -141,7 +141,7 @@ fn format_impl(
         }
 
         match &field.kind {
-            FieldKind::RequiredLeaf { default } => {
+            FieldKind::Leaf { kind: LeafKind::Required { default }, .. } => {
                 // Emit comment about default value or the value being required
                 if options.comments {
                     if let Some(v) = default {
@@ -164,7 +164,7 @@ fn format_impl(
                 }
             }
 
-            FieldKind::OptionalLeaf => emit!("#{} =", field.name),
+            FieldKind::Leaf { kind: LeafKind::Optional, .. } => emit!("#{} =", field.name),
 
             FieldKind::Nested { meta } => {
                 let child_path = path.iter().copied().chain([field.name]).collect();
