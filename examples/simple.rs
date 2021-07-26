@@ -43,6 +43,7 @@ fn main() -> Result<(), anyhow::Error> {
     println!("--------------------------------------------------------");
 
     let r = Conf::builder()
+        .env()
         .file("examples/files/simple.toml")
         .file("examples/files/etc/simple.yaml")
         .load()?;

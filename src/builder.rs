@@ -30,6 +30,12 @@ impl<C: Config> Builder<C> {
         self
     }
 
+    /// Adds the environment variables as a source.
+    pub fn env(mut self) -> Self {
+        self.sources.push(Source::Env);
+        self
+    }
+
     /// Adds an already loaded partial configuration as source.
     pub fn preloaded(mut self, partial: C::Partial) -> Self {
         self.sources.push(Source::Preloaded(partial));
@@ -46,6 +52,7 @@ impl<C: Config> Builder<C> {
         for source in self.sources {
             let layer = match source {
                 Source::File(path) => File::new(path)?.load()?,
+                Source::Env => C::Partial::from_env()?,
                 Source::Preloaded(p) => p,
             };
 
@@ -58,5 +65,6 @@ impl<C: Config> Builder<C> {
 
 enum Source<C: Config> {
     File(PathBuf),
+    Env,
     Preloaded(C::Partial),
 }
