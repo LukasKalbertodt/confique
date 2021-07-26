@@ -302,7 +302,15 @@ impl Parse for InternalAttr {
                 let _: Token![=] = input.parse()?;
                 let key: syn::LitStr = input.parse()?;
                 assert_empty(input)?;
-                Ok(Self::Env(key.value()))
+                let value = key.value();
+                if value.contains('=') || value.contains('\0') {
+                    Err(syn::Error::new(
+                        key.span(),
+                        "environment variable key must not contain '=' or null bytes",
+                    ))
+                } else {
+                    Ok(Self::Env(value))
+                }
             }
 
             _ => Err(syn::Error::new(ident.span(), "unknown confique attribute")),
