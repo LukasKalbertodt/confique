@@ -120,6 +120,19 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
         }
     });
 
+    let from_env_fields = input.fields.iter().map(|f| {
+        match &f.kind {
+            FieldKind::Leaf { env: Some(key), .. } => {
+                let field = format!("{}::{}", input.name, f.name);
+                quote! {
+                    confique::internal::from_env(#key, #field)?
+                }
+            }
+            FieldKind::Leaf { .. } => quote! { None },
+            FieldKind::Nested { .. } => quote! { confique::Partial::from_env()? },
+        }
+    });
+
     let fallbacks= input.fields.iter().map(|f| {
         let name = &f.name;
         if f.is_leaf() {
@@ -172,6 +185,12 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
                     Self {
                         #( #field_names: #defaults, )*
                     }
+                }
+
+                fn from_env() -> Result<Self, confique::Error> {
+                    Ok(Self {
+                        #( #field_names: #from_env_fields, )*
+                    })
                 }
 
                 fn with_fallback(self, fallback: Self) -> Self {

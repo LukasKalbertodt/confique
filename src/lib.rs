@@ -105,6 +105,15 @@ pub trait Partial: for<'de> Deserialize<'de> {
     /// values/fields set to `None`/being empty.
     fn default_values() -> Self;
 
+    /// Loads values from environment variables. This is only relevant for
+    /// fields annotated with `#[config(env = "...")]`: all fields not
+    /// annotated `env` will be `None`.
+    ///
+    /// If the env variable corresponding to a field is not set, that field is
+    /// `None`. If it is set but it failed to deserialize into the target type,
+    /// an error is returned.
+    fn from_env() -> Result<Self, Error>;
+
     /// Combines two partial configuration objects. `self` has a higher
     /// priority; missing values in `self` are filled with values in `fallback`,
     /// if they exist. The semantics of this method is basically like in

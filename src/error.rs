@@ -28,6 +28,14 @@ pub(crate) enum ErrorInner {
         err: Box<dyn std::error::Error + Send + Sync>,
     },
 
+    /// When deserialization via `env` fails. The string is what is passed to
+    /// `serde::de::Error::custom`.
+    EnvDeserialization {
+        field: String,
+        key: String,
+        msg: String,
+    },
+
     /// Returned by the [`Source`] impls for `Path` and `PathBuf` if the file
     /// extension is not supported by confique or if the corresponding Cargo
     /// feature of confique was not enabled.
@@ -53,6 +61,7 @@ impl std::error::Error for Error {
             ErrorInner::Io { err, .. } => Some(err),
             ErrorInner::Deserialization { err, .. } => Some(&**err),
             ErrorInner::MissingValue(_)
+            | ErrorInner::EnvDeserialization { .. }
             | ErrorInner::UnsupportedFileFormat { .. }
             | ErrorInner::MissingFileExtension { .. }
             | ErrorInner::MissingRequiredFile { .. } => None,
@@ -80,6 +89,14 @@ impl fmt::Display for Error {
             }
             ErrorInner::Deserialization { source: None, .. } => {
                 std::write!(f, "failed to deserialize configuration")
+            }
+            ErrorInner::EnvDeserialization { field, key, msg } => {
+                std::write!(f,
+                    "failed to deserialize value `{}` from environment variable `{}`: {}",
+                    field,
+                    key,
+                    msg,
+                )
             }
             ErrorInner::UnsupportedFileFormat { path } => {
                 std::write!(f,
