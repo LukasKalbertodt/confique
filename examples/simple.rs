@@ -1,5 +1,5 @@
 use std::{net::IpAddr, path::PathBuf};
-use confique::{Config, toml::FormatOptions};
+use confique::Config;
 
 #[derive(Debug, Config)]
 /// A sample configuration for our app.
@@ -37,19 +37,13 @@ struct LogConfig {
 
 
 fn main() -> Result<(), anyhow::Error> {
-    println!("TEMPLATE:");
-    println!("--------------------------------------------------------");
-    print!("{}", confique::toml::format::<Conf>(FormatOptions::default()));
-    println!("--------------------------------------------------------");
-
     let r = Conf::builder()
         .env()
         .file("examples/files/simple.toml")
         .file("examples/files/etc/simple.yaml")
         .load()?;
 
-    println!();
-    println!("LOADED CONFIGURATION: {:#?}", r);
+    println!("{:#?}", r);
 
     Ok(())
 }

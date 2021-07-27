@@ -9,8 +9,10 @@ mod builder;
 mod env;
 mod error;
 mod file;
-mod format;
 pub mod meta;
+
+#[cfg(any(feature = "toml", feature = "yaml"))]
+mod format;
 
 #[cfg(feature = "toml")]
 pub mod toml;
