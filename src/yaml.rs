@@ -1,3 +1,6 @@
+//! YAML specific features. This module only exists if the Cargo feature `yaml`
+//! is enabled.
+
 use std::fmt::{self, Write};
 
 use crate::{

@@ -108,7 +108,8 @@ pub use self::{
 ///
 /// - **`Option<T>`**: this marks the field as an optional field. All other
 ///   fields are non-optional and will raise an error if while loading the
-///   configuration, no value has been set for them.
+///   configuration, no value has been set for them. Optional fields cannot have
+///   a `#[config(default = ...)]` attribute as that would not make sense.
 ///
 ///
 ///

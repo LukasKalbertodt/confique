@@ -7,6 +7,7 @@ use core::fmt;
 // fine, but before reaching 1.0 I need to figure out how to allow future
 // additions without breaking stuff.
 
+/// Root type.
 #[derive(Clone, Copy, Debug)]
 pub struct Meta {
     /// The type (struct) name.
@@ -38,9 +39,11 @@ pub enum FieldKind {
 
 #[derive(Clone, Copy, Debug)]
 pub enum LeafKind {
+    /// A leaf field with a non `Option<_>` type.
     Required {
         default: Option<Expr>,
     },
+    /// A leaf field with an `Option<_>` type.
     Optional,
 }
 

@@ -6,7 +6,8 @@ use crate::{Error, Partial, error::ErrorInner};
 /// A file as source for configuration.
 ///
 /// By default, the file is considered optional, meaning that on [`File::load`],
-/// if the file does not exist, `Partial::empty()` is returned.
+/// if the file does not exist, [`Partial::empty()`][crate::Partial::empty] is
+/// returned.
 pub struct File {
     path: PathBuf,
     format: FileFormat,
