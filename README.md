@@ -56,6 +56,32 @@ let config = Conf::builder()
 
 See [**the documentation**](https://docs.rs/confique) for more information.
 
+
+## Comparison with other libraries/solutions
+
+Obviously, all other libraries are more mature than confique.
+
+### [`config`](https://crates.io/crates/config)
+
+- Loosely typed:
+    - You access configuration values via string path (e.g. `http.port`) and deserialize at "use site".
+    - No defined schema
+- More features
+- Larger library
+- If you need a "config template", you need to repeat yourself
+
+### [`figment`](https://crates.io/crates/figment)
+
+- Also based on `serde` and also uses your own structs as data store, thus type safe
+- If you need a "config template", you need to repeat yourself
+
+### Just `serde`?
+
+Serde is not a configuration, but a deserialization library.
+But you can get surprisingly far with just serde and it might actually be sufficient for your project.
+However, once you want to load from multiple sources, you either have make all your fields `Option` or repeat yourself.
+
+
 ## Status of this project
 
 Confique is still a very young project.
