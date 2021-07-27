@@ -1,6 +1,3 @@
-//! TOML specific features. This module only exists if the Cargo feature `toml`
-//! is enabled.
-
 use std::fmt::{self, Write};
 
 use crate::{
@@ -11,11 +8,11 @@ use crate::{
 
 
 
-/// Options for generating a TOML template.
+/// Options for generating a YAML template.
 pub struct FormatOptions {
     // TODO: think about forward/backwards compatibility.
 
-    /// Indentation for nested tables. Default: 0.
+    /// Amount of indentation in spaces. Default: 2.
     pub indent: u8,
 
     /// Whether to include doc comments (with your own text and information
@@ -31,13 +28,14 @@ pub struct FormatOptions {
 impl Default for FormatOptions {
     fn default() -> Self {
         Self {
-            indent: 0,
+            indent: 2,
             comments: true,
         }
     }
 }
 
-/// Formats the configuration description as a TOML file.
+
+/// Formats the configuration description as a YAML file.
 ///
 /// This can be used to generate a template file that you can give to the users
 /// of your application. It usually is a convenient to start with a correctly
@@ -47,7 +45,7 @@ impl Default for FormatOptions {
 ///
 /// ```
 /// use std::path::PathBuf;
-/// use confique::{Config, toml::FormatOptions};
+/// use confique::{Config, yaml::FormatOptions};
 ///
 /// /// App configuration.
 /// #[derive(Config)]
@@ -71,25 +69,25 @@ impl Default for FormatOptions {
 /// }
 ///
 ///
-/// let toml = confique::toml::format::<Conf>(FormatOptions::default());
-/// assert_eq!(toml, "\
-///     ## App configuration.\n\
-///     \n\
-///     ## The color of the app.\n\
-///     ##\n\
-///     ## Required! This value must be specified.\n\
-///     ##color =\n\
-///     \n\
-///     [log]\n\
-///     ## If set to `true`, the app will log to stdout.\n\
-///     ##\n\
-///     ## Default value: true\n\
-///     ##stdout = true\n\
-///     \n\
-///     ## If this is set, the app will write logs to the given file. Of course,\n\
-///     ## the app has to have write access to that file.\n\
-///     ##file =\n\
-/// ");
+/// let yaml = confique::yaml::format::<Conf>(FormatOptions::default());
+/// assert_eq!(yaml, concat!(
+///     "# App configuration.\n",
+///     "\n",
+///     "# The color of the app.\n",
+///     "#\n",
+///     "# Required! This value must be specified.\n",
+///     "#color:\n",
+///     "\n",
+///     "log:\n",
+///     "  # If set to `true`, the app will log to stdout.\n",
+///     "  #\n",
+///     "  # Default value: true\n",
+///     "  #stdout: true\n",
+///     "\n",
+///     "  # If this is set, the app will write logs to the given file. Of course,\n",
+///     "  # the app has to have write access to that file.\n",
+///     "  #file:\n",
+/// ));
 /// ```
 pub fn format<C: Config>(options: FormatOptions) -> String {
     let mut out = String::new();
@@ -104,7 +102,7 @@ pub fn format<C: Config>(options: FormatOptions) -> String {
     }
 
     // Recursively format all nested objects and fields
-    format_impl(&mut out, meta, vec![], &options);
+    format_impl(&mut out, meta, 0, &options);
     assert_single_trailing_newline(&mut out);
 
     out
@@ -113,22 +111,17 @@ pub fn format<C: Config>(options: FormatOptions) -> String {
 fn format_impl(
     s: &mut String,
     meta: &Meta,
-    path: Vec<&str>,
+    depth: usize,
     options: &FormatOptions,
 ) {
     /// Like `println!` but into `s` and with indentation.
     macro_rules! emit {
         ($fmt:literal $(, $args:expr)* $(,)?) => {{
             // Writing to a string never fails, we can unwrap.
-            let indent = path.len().saturating_sub(1) * options.indent as usize;
+            let indent = depth * options.indent as usize;
             write!(s, "{: <1$}", "", indent).unwrap();
             writeln!(s, $fmt $(, $args)*).unwrap();
         }};
-    }
-
-    if !path.is_empty() {
-        add_empty_line(s);
-        emit!("[{}]", path.join("."));
     }
 
     for field in meta.fields {
@@ -148,16 +141,16 @@ fn format_impl(
 
                 // Emit the actual line with the name and optional value
                 match default {
-                    Some(v) => emit!("#{} = {}", field.name, PrintExpr(v)),
-                    None => emit!("#{} =", field.name),
+                    Some(v) => emit!("#{}: {}", field.name, PrintExpr(v)),
+                    None => emit!("#{}:", field.name),
                 }
             }
 
-            FieldKind::Leaf { kind: LeafKind::Optional, .. } => emit!("#{} =", field.name),
+            FieldKind::Leaf { kind: LeafKind::Optional, .. } => emit!("#{}:", field.name),
 
             FieldKind::Nested { meta } => {
-                let child_path = path.iter().copied().chain([field.name]).collect();
-                format_impl(s, meta, child_path, options);
+                emit!("{}:", field.name);
+                format_impl(s, meta, depth + 1, options);
             }
         }
 
@@ -167,14 +160,22 @@ fn format_impl(
     }
 }
 
-/// Helper to emit `meta::Expr` into TOML.
+/// Helper to emit `meta::Expr` into YAML.
 struct PrintExpr(&'static Expr);
 
 impl fmt::Display for PrintExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.0 {
-            // TODO: escape stuff!
-            Expr::Str(v) => write!(f, "\"{}\"", v),
+        match *self.0 {
+            Expr::Str(v) => {
+                // This is a bit ugly. Sadly, no YAML crate in our dependency
+                // tree has an API to serialize a string only, without emitting
+                // the `---` at the start of the document. But instead of
+                // implementing the quoting logic ourselves (which is really
+                // complicated as it turns out!), we use this hack.
+                let value = serde_yaml::Value::String(v.to_owned());
+                let serialized = serde_yaml::to_string(&value).unwrap();
+                serialized[4..].fmt(f)
+            },
             Expr::Float(v) => v.fmt(f),
             Expr::Integer(v) => v.fmt(f),
             Expr::Bool(v) => v.fmt(f),
