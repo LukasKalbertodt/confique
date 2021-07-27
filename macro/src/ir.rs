@@ -228,30 +228,34 @@ fn extract_internal_attrs(
 
     let mut out = InternalAttrs::default();
     for attr in internal_attrs {
-        let parsed = attr.parse_args::<InternalAttr>()?;
-        let keyword = parsed.keyword();
+        type AttrList = syn::punctuated::Punctuated<InternalAttr, Token![,]>;
+        let parsed_list = attr.parse_args_with(AttrList::parse_terminated)?;
 
-        macro_rules! duplicate_if {
-            ($cond:expr) => {
-                if $cond {
-                    let msg = format!("duplicate '{}' confique attribute", keyword);
-                    return Err(Error::new(attr.tokens.span(), msg));
+        for parsed in parsed_list {
+            let keyword = parsed.keyword();
+
+            macro_rules! duplicate_if {
+                ($cond:expr) => {
+                    if $cond {
+                        let msg = format!("duplicate '{}' confique attribute", keyword);
+                        return Err(Error::new(attr.tokens.span(), msg));
+                    }
+                };
+            }
+
+            match parsed {
+                InternalAttr::Default(expr) => {
+                    duplicate_if!(out.default.is_some());
+                    out.default = Some(expr);
                 }
-            };
-        }
-
-        match parsed {
-            InternalAttr::Default(expr) => {
-                duplicate_if!(out.default.is_some());
-                out.default = Some(expr);
-            }
-            InternalAttr::Nested => {
-                duplicate_if!(out.nested);
-                out.nested = true;
-            }
-            InternalAttr::Env(key) => {
-                duplicate_if!(out.env.is_some());
-                out.env = Some(key);
+                InternalAttr::Nested => {
+                    duplicate_if!(out.nested);
+                    out.nested = true;
+                }
+                InternalAttr::Env(key) => {
+                    duplicate_if!(out.env.is_some());
+                    out.env = Some(key);
+                }
             }
         }
     }
@@ -287,21 +291,21 @@ impl Parse for InternalAttr {
         let ident: syn::Ident = input.parse()?;
         match &*ident.to_string() {
             "nested" => {
-                assert_empty(input)?;
+                assert_empty_or_comma(input)?;
                 Ok(Self::Nested)
             }
 
             "default" => {
                 let _: Token![=] = input.parse()?;
                 let expr = Expr::from_lit(input.parse()?)?;
-                assert_empty(input)?;
+                assert_empty_or_comma(input)?;
                 Ok(Self::Default(expr))
             }
 
             "env" => {
                 let _: Token![=] = input.parse()?;
                 let key: syn::LitStr = input.parse()?;
-                assert_empty(input)?;
+                assert_empty_or_comma(input)?;
                 let value = key.value();
                 if value.contains('=') || value.contains('\0') {
                     Err(syn::Error::new(
@@ -318,8 +322,8 @@ impl Parse for InternalAttr {
     }
 }
 
-fn assert_empty(input: ParseStream) -> Result<(), Error> {
-    if input.is_empty() {
+fn assert_empty_or_comma(input: ParseStream) -> Result<(), Error> {
+    if input.is_empty() || input.peek(Token![,]) {
         Ok(())
     } else {
         Err(Error::new(input.span(), "unexpected tokens, expected no more tokens in this context"))
