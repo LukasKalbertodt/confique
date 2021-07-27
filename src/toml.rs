@@ -172,9 +172,8 @@ struct PrintExpr(&'static Expr);
 
 impl fmt::Display for PrintExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.0 {
-            // TODO: escape stuff!
-            Expr::Str(v) => write!(f, "\"{}\"", v),
+        match *self.0 {
+            Expr::Str(v) => toml::Value::String(v.to_owned()).fmt(f),
             Expr::Float(v) => v.fmt(f),
             Expr::Integer(v) => v.fmt(f),
             Expr::Bool(v) => v.fmt(f),
