@@ -46,6 +46,7 @@ fn gen_config_impl(input: &ir::Input) -> TokenStream {
 
     let meta_item = gen_meta(input);
     quote! {
+        #[automatically_derived]
         impl confique::Config for #name {
             type Partial = #partial_mod_name::#partial_struct_name;
 
@@ -174,6 +175,7 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
                 #( #struct_fields, )*
             }
 
+            #[automatically_derived]
             impl confique::Partial for #struct_name {
                 fn empty() -> Self {
                     Self {
