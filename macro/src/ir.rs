@@ -6,7 +6,6 @@ use crate::util::{is_option, unwrap_option};
 
 
 /// The parsed input to the `gen_config` macro.
-#[derive(Debug)]
 pub(crate) struct Input {
     pub(crate) doc: Vec<String>,
     pub(crate) visibility: syn::Visibility,
@@ -14,7 +13,6 @@ pub(crate) struct Input {
     pub(crate) fields: Vec<Field>,
 }
 
-#[derive(Debug)]
 pub(crate) struct Field {
     pub(crate) doc: Vec<String>,
     pub(crate) name: syn::Ident,
@@ -26,7 +24,6 @@ pub(crate) struct Field {
     // - example
 }
 
-#[derive(Debug)]
 pub(crate) enum FieldKind {
     Leaf {
         env: Option<String>,
@@ -39,7 +36,6 @@ pub(crate) enum FieldKind {
     },
 }
 
-#[derive(Debug)]
 pub(crate) enum LeafKind {
     /// A non-optional leaf. `ty` is not `Option<_>`.
     Required {
@@ -61,7 +57,6 @@ impl LeafKind {
 
 /// The kinds of expressions (just literals) we allow for default or example
 /// values.
-#[derive(Debug)]
 pub(crate) enum Expr {
     Str(syn::LitStr),
     Int(syn::LitInt),
