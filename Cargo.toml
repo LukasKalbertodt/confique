@@ -4,10 +4,21 @@ version = "0.1.0"
 authors = ["Lukas Kalbertodt <lukas.kalbertodt@gmail.com>"]
 edition = "2018"
 
+description = "Type-safe, layered, light-weight, `serde`-based configuration library"
+documentation = "https://docs.rs/confique/"
+repository = "https://github.com/LukasKalbertodt/confique/"
+readme = "README.md"
+license = "MIT/Apache-2.0"
+
+keywords = ["config", "configuration", "conf", "serde", "type-safe"]
+categories = ["config"]
+exclude = [".github"]
+
 
 [features]
 default = ["toml", "yaml"]
 yaml = ["serde_yaml"]
+
 
 [dependencies]
 confique-macro = { path = "macro" }
