@@ -36,7 +36,7 @@ struct LogConfig {
 }
 
 
-fn main() -> Result<(), anyhow::Error> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let r = Conf::builder()
         .env()
         .file("examples/files/simple.toml")

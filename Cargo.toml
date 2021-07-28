@@ -14,7 +14,3 @@ confique-macro = { path = "macro" }
 serde = { version = "1", features = ["derive"] }
 serde_yaml = { version = "0.8", optional = true }
 toml = { version = "0.5", optional = true }
-
-[dev-dependencies]
-log = { version = "0.4", features = ["serde"] }
-anyhow = "1"
