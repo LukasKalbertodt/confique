@@ -4,6 +4,10 @@ version = "0.0.1"
 authors = ["Lukas Kalbertodt <lukas.kalbertodt@gmail.com>"]
 edition = "2018"
 
+description = "Macro crate for 'confique'. Do not use directly! Semver not guaranteed!"
+repository = "https://github.com/LukasKalbertodt/confique/"
+license = "MIT/Apache-2.0"
+
 [lib]
 proc-macro = true
 
