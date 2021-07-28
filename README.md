@@ -64,22 +64,24 @@ Obviously, all other libraries are more mature than confique.
 ### [`config`](https://crates.io/crates/config)
 
 - Loosely typed:
-    - You access configuration values via string path (e.g. `http.port`) and deserialize at "use site".
+    - You access configuration values via string path (e.g. `"http.port"`) and deserialize at "use site".
     - No defined schema
 - More features
 - Larger library
-- If you need a "config template", you need to repeat yourself
+- If you need a "config template", you need to repeat code/docs
 
 ### [`figment`](https://crates.io/crates/figment)
 
 - Also based on `serde` and also uses your own structs as data store, thus type safe
-- If you need a "config template", you need to repeat yourself
+- Instead of using partial types, aggregates different layers in a dynamic data store
+- If you need a "config template", you need to repeat code/docs
 
 ### Just `serde`?
 
 Serde is not a configuration, but a deserialization library.
 But you can get surprisingly far with just serde and it might actually be sufficient for your project.
-However, once you want to load from multiple sources, you either have make all your fields `Option` or repeat yourself.
+However, once you want to load from multiple sources, you either have make all your fields `Option` or repeat code/docs.
+With `confique` you also get some other handy helpers.
 
 
 ## Status of this project
