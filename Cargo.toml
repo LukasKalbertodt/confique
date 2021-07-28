@@ -15,6 +15,11 @@ categories = ["config"]
 exclude = [".github"]
 
 
+[[example]]
+name = "simple"
+required-features = ["toml"]
+
+
 [features]
 default = ["toml", "yaml"]
 yaml = ["serde_yaml"]

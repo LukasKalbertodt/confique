@@ -88,9 +88,11 @@
 //! # #[derive(Config)]
 //! # struct Conf {}
 //! // Load from a single file only.
+//! # #[cfg(feature = "toml")]
 //! let config = Conf::from_file("config.toml")?;
 //!
 //! // Or load from multiple sources (higher priority sources are listed first).
+//! # #[cfg(feature = "toml")]
 //! let config = Conf::builder()
 //!     .env()
 //!     .file("config.toml")
@@ -113,7 +115,10 @@
 //! [`Partial::default_values`] as the last layer.
 //!
 //! ```rust,no_run
+//! # #[cfg(feature = "toml")]
 //! use confique::{Config, File, FileFormat, Partial};
+//! # #[cfg(not(feature = "toml"))]
+//! # use confique::{Config, Partial};
 //!
 //! #[derive(Config)]
 //! struct Conf {
@@ -121,9 +126,12 @@
 //! }
 //!
 //! type PartialConf = <Conf as Config>::Partial;
+//! # #[cfg(feature = "toml")]
 //! let from_file: PartialConf = File::with_format("/etc/foo/config", FileFormat::Toml)
 //!     .required()
 //!     .load()?;
+//! # #[cfg(not(feature = "toml"))]
+//! let from_file: PartialConf = todo!();
 //! let manual = PartialConf {
 //!     // Remember: all fields in the partial types are `Option`s!
 //!     foo: Some(3.14),
@@ -149,6 +157,7 @@
 //! - `toml`: enables TOML support and adds the `toml` dependency.
 //! - `yaml`: enables YAML support and adds the `serde_yaml` dependency.
 
+#[cfg(any(feature = "toml", feature = "yaml"))]
 use std::path::PathBuf;
 
 use serde::Deserialize;
@@ -159,11 +168,13 @@ pub mod internal;
 mod builder;
 mod env;
 mod error;
-mod file;
 pub mod meta;
 
 #[cfg(any(feature = "toml", feature = "yaml"))]
 mod format;
+
+#[cfg(any(feature = "toml", feature = "yaml"))]
+mod file;
 
 #[cfg(feature = "toml")]
 pub mod toml;
@@ -176,8 +187,10 @@ pub use serde;
 pub use self::{
     builder::Builder,
     error::Error,
-    file::{File, FileFormat},
 };
+
+#[cfg(any(feature = "toml", feature = "yaml"))]
+pub use crate::file::{File, FileFormat};
 
 
 /// Derives (automatically implements) [`Config`] for a struct.
@@ -367,6 +380,7 @@ pub trait Config: Sized {
     ///     port: u16,
     /// }
     ///
+    /// #[cfg(feature = "toml")]
     /// let conf = Conf::builder()
     ///     .env()
     ///     .file("app.toml")
@@ -400,6 +414,7 @@ pub trait Config: Sized {
     ///
     /// let conf = Conf::from_file("config.toml");
     /// ```
+    #[cfg(any(feature = "toml", feature = "yaml"))]
     fn from_file(path: impl Into<PathBuf>) -> Result<Self, Error> {
         let default_values = Self::Partial::default_values();
         let mut file = File::new(path)?;
