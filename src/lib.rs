@@ -1,3 +1,154 @@
+//! Confique is a type-safe, layered, light-weight, `serde`-based configuration library.
+//!
+//! The core of the library is the [`Config`] trait and [its derive-macro][macro@Config].
+//! You define your configuration value as one or more structs, each of which has
+//! to `#[derive(Config)]`. Then you can use different ways of loading an instancce
+//! of your root configuration struct.
+//!
+//!
+//! # How to use
+//!
+//! ## Defining your configuration with structs
+//!
+//! First, define some structs that describe all your configuration values. Use
+//! the types you want to use in your code. For example, if you have a `port`
+//! config and your code needs that value, it should be of type `u16`,
+//! and *not* `Option<u16>` or `String`. That way, the code using that value is
+//! cleanest.
+//!
+//! Small example:
+//!
+//! ```rust
+//! use confique::Config;
+//!
+//! #[derive(Config)]
+//! struct Conf {
+//!     // A required value. Since it's not `Option<_>`, it has to be specified when
+//!     // loading the configuration, or else loading returns an error.
+//!     username: String,
+//!
+//!     // An optional value.
+//!     welcome_message: Option<String>,
+//!
+//!     // A required value with default value. If no other value is specified
+//!     // (e.g. in a config file), the default value is used.
+//!     #[config(default = 8080)]
+//!     port: u16,
+//! }
+//! ```
+//!
+//! As your application grows, oftentimes you want to split the configuration
+//! into multiple structs. This has the added benefit that your config files
+//! are somewhat structured or have sections. You can do that by including
+//! other types that implement `Config` with `#[config(nested)]`.
+//!
+//! ```rust
+//! use std::path::PathBuf;
+//! use confique::Config;
+//!
+//! #[derive(Config)]
+//! struct Conf {
+//!     username: String,
+//!
+//!     #[config(nested)]
+//!     log: LogConf,
+//!
+//!     #[config(nested)]
+//!     db: DbConf,
+//! }
+//!
+//! #[derive(Config)]
+//! struct LogConf {
+//!     #[config(default = true)]
+//!     stdout: bool,
+//!
+//!     file: Option<PathBuf>,
+//! }
+//!
+//! #[derive(Config)]
+//! struct DbConf {
+//!     // ...
+//! }
+//! ```
+//!
+//! You can also attach some other attributes to fields. For example, with
+//! `#[config(env = "KEY")]`, you can load a value from an environment variable.
+//! For more information, see the [docs for the derive macro][macro@Config].
+//!
+//!
+//! ## Loading the configuration
+//!
+//! Here, you have multiple options. Most of the time, you can probably use the
+//! provided high-level methods of [`Config`], like [`Config::from_file`] and
+//! [`Config::builder`].
+//!
+//! ```rust
+//! use confique::Config;
+//!
+//! # #[derive(Config)]
+//! # struct Conf {}
+//! // Load from a single file only.
+//! let config = Conf::from_file("config.toml")?;
+//!
+//! // Or load from multiple sources (higher priority sources are listed first).
+//! let config = Conf::builder()
+//!     .env()
+//!     .file("config.toml")
+//!     .file("/etc/myapp/config.toml")
+//!     .load()?;
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! But you can also assemble your configuration yourself. That's what
+//! the *partial* types are for (i.e. [`Config::Partial`]). These implement
+//! `serde::Deserialize` and can thus be loaded from a vast number of sources.
+//! One of those sources is the built-in [`File`] which gives you a bit more
+//! control when loading configuration from files. And you can always simply
+//! create an instance of the partial type by writing all values in Rust code
+//! with struct initializer syntax!
+//!
+//! Once you have all your layers (partial types) collected, you have to combine
+//! them via [`Partial::with_fallback`] and convert them to the actual config
+//! type via [`Config::from_partial`]. And you probably also want to use
+//! [`Partial::default_values`] as the last layer.
+//!
+//! ```rust,no_run
+//! use confique::{Config, File, FileFormat, Partial};
+//!
+//! #[derive(Config)]
+//! struct Conf {
+//!     foo: f32,
+//! }
+//!
+//! type PartialConf = <Conf as Config>::Partial;
+//! let from_file: PartialConf = File::with_format("/etc/foo/config", FileFormat::Toml)
+//!     .required()
+//!     .load()?;
+//! let manual = PartialConf {
+//!     // Remember: all fields in the partial types are `Option`s!
+//!     foo: Some(3.14),
+//! };
+//! let defaults = PartialConf::default_values();
+//!
+//! let merged = from_file.with_fallback(manual).with_fallback(defaults);
+//! let config = Conf::from_partial(merged)?;
+//! # Ok::<_, confique::Error>(())
+//! ```
+//!
+//! ## Using your configuration
+//!
+//! Well, this is the simple part: the loaded configuration is just an instance
+//! of your struct. And you already know how to access fields of structs!
+//!
+//!
+//! # Cargo features
+//!
+//! This crate has a Cargo feature for each supported file format which are all
+//! enabled by default.
+//!
+//! - `toml`: enables TOML support and adds the `toml` dependency.
+//! - `yaml`: enables YAML support and adds the `serde_yaml` dependency.
+
 use std::path::PathBuf;
 
 use serde::Deserialize;
@@ -83,7 +234,7 @@ pub use self::{
 ///   has to implement `serde::Deserialize`.
 ///
 /// Doc comments on the struct and the individual fields are interpreted and
-/// stored in [`Meta`]. They are used in the formatting functions
+/// stored in [`Meta`][meta::Meta]. They are used in the formatting functions
 /// (e.g. `toml::format`).
 ///
 ///
