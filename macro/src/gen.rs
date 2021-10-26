@@ -1,6 +1,6 @@
 use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, format_ident, quote, quote_spanned};
-use syn::Ident;
+use syn::{Ident, spanned::Spanned};
 
 use crate::ir::{self, Expr, FieldKind, LeafKind};
 
@@ -95,9 +95,13 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
                     #inner_vis #name: Option<#inner_ty>
                 }
             },
-            FieldKind::Nested { ty } => quote! {
-                #[serde(default = "confique::Partial::empty")]
-                #inner_vis #name: <#ty as confique::Config>::Partial
+            FieldKind::Nested { ty } => {
+                let ty_span = ty.span();
+                let field_ty = quote_spanned! {ty_span=> <#ty as confique::Config>::Partial };
+                quote! {
+                    #[serde(default = "confique::Partial::empty")]
+                    #inner_vis #name: #field_ty
+                }
             },
         }
     });
@@ -141,7 +145,7 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
         }
     });
 
-    let fallbacks= input.fields.iter().map(|f| {
+    let fallbacks = input.fields.iter().map(|f| {
         let name = &f.name;
         if f.is_leaf() {
             quote! { self.#name.or(fallback.#name) }
@@ -173,6 +177,13 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
         }
     });
 
+    let nested_bounds = input.fields.iter().filter_map(|f| {
+        match &f.kind {
+            FieldKind::Nested { ty } => Some(quote! { #ty: confique::Config }),
+            FieldKind::Leaf { .. } => None,
+        }
+    });
+
     let struct_visibility = inner_visibility(&input.visibility, Span::call_site());
     quote! {
         #visibility mod #mod_name {
@@ -184,7 +195,7 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
             }
 
             #[automatically_derived]
-            impl confique::Partial for #struct_name {
+            impl confique::Partial for #struct_name where #( #nested_bounds, )* {
                 fn empty() -> Self {
                     Self {
                         #( #field_names: #empty_values, )*
