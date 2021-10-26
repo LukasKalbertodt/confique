@@ -1,5 +1,5 @@
 use proc_macro2::{Span, TokenStream};
-use quote::{ToTokens, format_ident, quote};
+use quote::{ToTokens, format_ident, quote, quote_spanned};
 use syn::Ident;
 
 use crate::ir::{self, Expr, FieldKind, LeafKind};
@@ -75,18 +75,25 @@ fn partial_names(original_name: &Ident) -> (Ident, Ident) {
 fn gen_partial_mod(input: &ir::Input) -> TokenStream {
     let (mod_name, struct_name) = partial_names(&input.name);
     let visibility = &input.visibility;
-    let inner_vis = inner_visibility(&input.visibility);
 
     // Prepare some tokens per field.
     let field_names = input.fields.iter().map(|f| &f.name).collect::<Vec<_>>();
     let struct_fields = input.fields.iter().map(|f| {
         let name = &f.name;
+
+        // We have to use the span of the field's name here so that error
+        // messages from the `derive(serde::Deserialize)` have the correct span.
+        let inner_vis = inner_visibility(&input.visibility, name.span());
         match &f.kind {
-            FieldKind::Leaf { kind: LeafKind::Required { ty, .. }, .. } => quote! {
-                #inner_vis #name: Option<#ty>
-            },
-            FieldKind::Leaf { kind: LeafKind::Optional { inner_ty }, .. } => quote! {
-                #inner_vis #name: Option<#inner_ty>
+            FieldKind::Leaf { kind: LeafKind::Required { ty, .. }, .. } => {
+                quote_spanned! {name.span()=>
+                    #inner_vis #name: Option<#ty>
+                }
+            }
+            FieldKind::Leaf { kind: LeafKind::Optional { inner_ty }, .. } => {
+                quote_spanned! {name.span()=>
+                    #inner_vis #name: Option<#inner_ty>
+                }
             },
             FieldKind::Nested { ty } => quote! {
                 #[serde(default = "confique::Partial::empty")]
@@ -166,12 +173,13 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
         }
     });
 
+    let struct_visibility = inner_visibility(&input.visibility, Span::call_site());
     quote! {
         #visibility mod #mod_name {
             use super::*;
 
             #[derive(confique::serde::Deserialize)]
-            #inner_vis struct #struct_name {
+            #struct_visibility struct #struct_name {
                 #( #struct_fields, )*
             }
 
@@ -359,28 +367,30 @@ impl ToTokens for ir::Expr {
     }
 }
 
-fn inner_visibility(outer: &syn::Visibility) -> TokenStream {
+fn inner_visibility(outer: &syn::Visibility, span: Span) -> TokenStream {
     match outer {
         // These visibilities can be used as they are. No adjustment needed.
-        syn::Visibility::Public(_) | syn::Visibility::Crate(_) => quote! { outer },
+        syn::Visibility::Public(_) | syn::Visibility::Crate(_) => quote_spanned! {span=> outer },
 
         // The inherited one is relative to the parent module.
-        syn::Visibility::Inherited => quote! { pub(super) },
+        syn::Visibility::Inherited => quote_spanned! {span=> pub(super) },
 
         // For `pub(crate)`
         syn::Visibility::Restricted(r) if r.path.is_ident("crate") && r.in_token.is_none() => {
-            quote! { pub(crate) }
+            quote_spanned! {span=> pub(crate) }
         },
 
         // If the path in the `pub(in <path>)` visibility is absolute, we can
         // use it like that as well.
-        syn::Visibility::Restricted(r) if r.path.leading_colon.is_some() => quote! { outer },
+        syn::Visibility::Restricted(r) if r.path.leading_colon.is_some() => {
+            quote_spanned! {span=> outer }
+        },
 
         // But in the case `pub(in <path>)` with a relative path, we have to
         // prefix `super::`.
         syn::Visibility::Restricted(r) => {
             let path = &r.path;
-            quote! { pub(in super::#path) }
+            quote_spanned! {span=> pub(in super::#path) }
         }
     }
 }
