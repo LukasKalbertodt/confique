@@ -27,6 +27,7 @@ pub(crate) struct Field {
 pub(crate) enum FieldKind {
     Leaf {
         env: Option<String>,
+        deserialize_with: Option<syn::Path>,
         kind: LeafKind,
     },
 
@@ -52,6 +53,13 @@ pub(crate) enum LeafKind {
 impl LeafKind {
     pub(crate) fn is_required(&self) -> bool {
         matches!(self, Self::Required { .. })
+    }
+
+    pub(crate) fn inner_ty(&self) -> &syn::Type {
+        match self {
+            Self::Required { ty, .. } => ty,
+            Self::Optional { inner_ty } => inner_ty,
+        }
     }
 }
 
@@ -115,12 +123,19 @@ impl Field {
                     "cannot specify `nested` and `env` attributes at the same time",
                 ));
             }
+            if attrs.deserialize_with.is_some() {
+                return Err(Error::new(
+                    field.ident.span(),
+                    "cannot specify `nested` and `deserialize_with` attributes at the same time",
+                ));
+            }
 
             FieldKind::Nested { ty: field.ty }
         } else {
             match unwrap_option(&field.ty) {
                 None => FieldKind::Leaf {
                     env: attrs.env,
+                    deserialize_with: attrs.deserialize_with,
                     kind: LeafKind::Required {
                         default: attrs.default,
                         ty: field.ty,
@@ -137,6 +152,7 @@ impl Field {
 
                     FieldKind::Leaf {
                         env: attrs.env,
+                        deserialize_with: attrs.deserialize_with,
                         kind: LeafKind::Optional {
                             inner_ty: inner.clone(),
                         },
@@ -251,6 +267,10 @@ fn extract_internal_attrs(
                     duplicate_if!(out.env.is_some());
                     out.env = Some(key);
                 }
+                InternalAttr::DeserializeWith(path) => {
+                    duplicate_if!(out.deserialize_with.is_some());
+                    out.deserialize_with = Some(path);
+                }
             }
         }
     }
@@ -262,13 +282,15 @@ fn extract_internal_attrs(
 struct InternalAttrs {
     nested: bool,
     default: Option<Expr>,
-    env: Option<String>
+    env: Option<String>,
+    deserialize_with: Option<syn::Path>,
 }
 
 enum InternalAttr {
     Nested,
     Default(Expr),
     Env(String),
+    DeserializeWith(syn::Path),
 }
 
 impl InternalAttr {
@@ -277,6 +299,7 @@ impl InternalAttr {
             Self::Nested => "nested",
             Self::Default(_) => "default",
             Self::Env(_) => "env",
+            Self::DeserializeWith(_) => "deserialize_with",
         }
     }
 }
@@ -310,6 +333,14 @@ impl Parse for InternalAttr {
                 } else {
                     Ok(Self::Env(value))
                 }
+            }
+
+            "deserialize_with" => {
+                let _: Token![=] = input.parse()?;
+                let path: syn::Path = input.parse()?;
+                assert_empty_or_comma(input)?;
+
+                Ok(Self::DeserializeWith(path))
             }
 
             _ => Err(syn::Error::new(ident.span(), "unknown confique attribute")),

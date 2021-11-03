@@ -76,6 +76,10 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
     let (mod_name, struct_name) = partial_names(&input.name);
     let visibility = &input.visibility;
 
+    fn deserialize_fn_name(field_name: &Ident) -> Ident {
+        quote::format_ident!("deserialize_{}", field_name)
+    }
+
     // Prepare some tokens per field.
     let field_names = input.fields.iter().map(|f| &f.name).collect::<Vec<_>>();
     let struct_fields = input.fields.iter().map(|f| {
@@ -85,16 +89,22 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
         // messages from the `derive(serde::Deserialize)` have the correct span.
         let inner_vis = inner_visibility(&input.visibility, name.span());
         match &f.kind {
-            FieldKind::Leaf { kind: LeafKind::Required { ty, .. }, .. } => {
-                quote_spanned! {name.span()=>
-                    #inner_vis #name: Option<#ty>
-                }
+            FieldKind::Leaf { kind, deserialize_with, .. } => {
+                let ty = kind.inner_ty();
+                let attr = match deserialize_with {
+                    None => quote! {},
+                    Some(p) => {
+                        // let s = p.to_token_stream().to_string();
+                        let fn_name = deserialize_fn_name(&f.name).to_string();
+                        quote_spanned! {p.span()=>
+                            #[serde(default, deserialize_with = #fn_name)]
+                        }
+                    }
+                };
+
+                let main = quote_spanned! {name.span()=> #inner_vis #name: Option<#ty> };
+                quote! { #attr #main }
             }
-            FieldKind::Leaf { kind: LeafKind::Optional { inner_ty }, .. } => {
-                quote_spanned! {name.span()=>
-                    #inner_vis #name: Option<#inner_ty>
-                }
-            },
             FieldKind::Nested { ty } => {
                 let ty_span = ty.span();
                 let field_ty = quote_spanned! {ty_span=> <#ty as confique::Config>::Partial };
@@ -116,15 +126,24 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
 
     let defaults = input.fields.iter().map(|f| {
         match &f.kind {
-            FieldKind::Leaf { kind: LeafKind::Required { default: Some(default), .. }, .. } => {
+            FieldKind::Leaf {
+                kind: LeafKind::Required { default: Some(default), .. },
+                deserialize_with,
+                ..
+            } => {
                 let msg = format!(
                     "default config value for `{}::{}` cannot be deserialized",
                     input.name,
                     f.name,
                 );
 
-                quote! {
-                    Some(confique::internal::deserialize_default(#default).expect(#msg))
+                match deserialize_with {
+                    None => quote! {
+                        Some(confique::internal::deserialize_default(#default).expect(#msg))
+                    },
+                    Some(p) => quote! {
+                        Some(#p(confique::internal::into_deserializer(#default)).expect(#msg))
+                    },
                 }
             }
             FieldKind::Leaf { .. } => quote! { None },
@@ -174,6 +193,25 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
                 }
             }
             FieldKind::Nested { .. } => quote! { self.#name.is_complete() },
+        }
+    });
+
+    let deserialize_fns = input.fields.iter().filter_map(|f| {
+        match &f.kind {
+            FieldKind::Leaf { kind, deserialize_with: Some(p), .. } => {
+                let fn_name = deserialize_fn_name(&f.name);
+                let ty = kind.inner_ty();
+
+                Some(quote! {
+                    fn #fn_name<'de, D>(deserializer: D) -> Result<Option<#ty>, D::Error>
+                    where
+                        D: serde::Deserializer<'de>,
+                    {
+                        #p(deserializer).map(Some)
+                    }
+                })
+            }
+            _ => None,
         }
     });
 
@@ -228,6 +266,8 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
                     true #(&& #is_complete_expr)*
                 }
             }
+
+            #(#deserialize_fns)*
         }
     }
 }
@@ -253,7 +293,7 @@ fn gen_meta(input: &ir::Input) -> TokenStream {
                     confique::meta::FieldKind::Nested { meta: &<#ty as confique::Config>::META }
                 }
             }
-            FieldKind::Leaf { env, kind: LeafKind::Optional { .. }} => {
+            FieldKind::Leaf { env, kind: LeafKind::Optional { .. }, ..} => {
                 let env = env_tokens(env);
                 quote! {
                     confique::meta::FieldKind::Leaf {
@@ -262,7 +302,7 @@ fn gen_meta(input: &ir::Input) -> TokenStream {
                     }
                 }
             }
-            FieldKind::Leaf { env, kind: LeafKind::Required { default, ty, .. }} => {
+            FieldKind::Leaf { env, kind: LeafKind::Required { default, ty, .. }, ..} => {
                 let env = env_tokens(env);
                 let default_value = gen_meta_default(default, &ty);
                 quote! {

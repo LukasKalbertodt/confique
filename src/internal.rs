@@ -12,6 +12,13 @@ where
     O::deserialize(src.into_deserializer())
 }
 
+pub fn into_deserializer<'de, T>(src: T) -> <T as serde::de::IntoDeserializer<'de>>::Deserializer
+where
+    T: serde::de::IntoDeserializer<'de>,
+{
+    src.into_deserializer()
+}
+
 pub fn missing_value_error(path: String) -> Error {
     ErrorInner::MissingValue(path).into()
 }
