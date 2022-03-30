@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::{net::IpAddr, path::PathBuf};
 use confique::Config;
 
