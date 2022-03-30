@@ -131,7 +131,10 @@ fn format_impl(
         emit!("[{}]", path.join("."));
     }
 
-    for field in meta.fields {
+    let leaf_fields = meta.fields.iter().filter(|f| matches!(&f.kind, FieldKind::Leaf { .. }));
+    let nested_fields = meta.fields.iter().filter(|f| matches!(&f.kind, FieldKind::Nested { .. }));
+
+    for field in leaf_fields.chain(nested_fields) {
         if options.comments {
             field.doc.iter().for_each(|doc| emit!("#{}", doc));
         }
