@@ -70,26 +70,27 @@ impl Default for FormatOptions {
 ///     file: Option<PathBuf>,
 /// }
 ///
-///
-/// let toml = confique::toml::format::<Conf>(FormatOptions::default());
-/// assert_eq!(toml, "\
-///     ## App configuration.\n\
-///     \n\
-///     ## The color of the app.\n\
-///     ##\n\
-///     ## Required! This value must be specified.\n\
-///     ##color =\n\
-///     \n\
-///     [log]\n\
-///     ## If set to `true`, the app will log to stdout.\n\
-///     ##\n\
-///     ## Default value: true\n\
-///     ##stdout = true\n\
-///     \n\
-///     ## If this is set, the app will write logs to the given file. Of course,\n\
-///     ## the app has to have write access to that file.\n\
-///     ##file =\n\
-/// ");
+/// fn main() {
+///     let toml = confique::toml::format::<Conf>(FormatOptions::default());
+///     assert_eq!(toml, "\
+///         ## App configuration.\n\
+///         \n\
+///         ## The color of the app.\n\
+///         ##\n\
+///         ## Required! This value must be specified.\n\
+///         ##color =\n\
+///         \n\
+///         [log]\n\
+///         ## If set to `true`, the app will log to stdout.\n\
+///         ##\n\
+///         ## Default value: true\n\
+///         ##stdout = true\n\
+///         \n\
+///         ## If this is set, the app will write logs to the given file. Of course,\n\
+///         ## the app has to have write access to that file.\n\
+///         ##file =\n\
+///     ");
+/// }
 /// ```
 pub fn format<C: Config>(options: FormatOptions) -> String {
     let mut out = String::new();

@@ -35,6 +35,7 @@
 //!     #[config(default = 8080)]
 //!     port: u16,
 //! }
+//! # fn main() {}
 //! ```
 //!
 //! As your application grows, oftentimes you want to split the configuration
@@ -69,6 +70,7 @@
 //! struct DbConf {
 //!     // ...
 //! }
+//! # fn main() {}
 //! ```
 //!
 //! You can also attach some other attributes to fields. For example, with
@@ -87,6 +89,7 @@
 //!
 //! # #[derive(Config)]
 //! # struct Conf {}
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! // Load from a single file only.
 //! # #[cfg(feature = "toml")]
 //! let config = Conf::from_file("config.toml")?;
@@ -98,7 +101,8 @@
 //!     .file("config.toml")
 //!     .file("/etc/myapp/config.toml")
 //!     .load()?;
-//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! But you can also assemble your configuration yourself. That's what
@@ -220,6 +224,7 @@ pub use crate::file::{File, FileFormat};
 ///     #[config(default = "127.0.0.1")]
 ///     bind: IpAddr,
 /// }
+/// # fn main() {}
 /// ```
 ///
 /// This derives `Config` for the two structs.
