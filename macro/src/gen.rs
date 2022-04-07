@@ -421,7 +421,7 @@ impl ToTokens for ir::Expr {
 fn inner_visibility(outer: &syn::Visibility, span: Span) -> TokenStream {
     match outer {
         // These visibilities can be used as they are. No adjustment needed.
-        syn::Visibility::Public(_) | syn::Visibility::Crate(_) => quote_spanned! {span=> outer },
+        syn::Visibility::Public(_) | syn::Visibility::Crate(_) => quote_spanned! {span=> #outer },
 
         // The inherited one is relative to the parent module.
         syn::Visibility::Inherited => quote_spanned! {span=> pub(super) },
@@ -434,7 +434,7 @@ fn inner_visibility(outer: &syn::Visibility, span: Span) -> TokenStream {
         // If the path in the `pub(in <path>)` visibility is absolute, we can
         // use it like that as well.
         syn::Visibility::Restricted(r) if r.path.leading_colon.is_some() => {
-            quote_spanned! {span=> outer }
+            quote_spanned! {span=> #outer }
         },
 
         // But in the case `pub(in <path>)` with a relative path, we have to
