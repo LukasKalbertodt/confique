@@ -184,3 +184,25 @@ impl fmt::Display for PrintExpr {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::test_utils::{self, include_format_output};
+    use super::{format, FormatOptions};
+    use pretty_assertions::assert_str_eq;
+
+    #[test]
+    fn default() {
+        let out = format::<test_utils::example1::Conf>(FormatOptions::default());
+        assert_str_eq!(&out, include_format_output!("1-default.toml"));
+    }
+
+    #[test]
+    fn no_comments() {
+        let out = format::<test_utils::example1::Conf>(FormatOptions {
+            comments: false,
+            indent: 0,
+        });
+        assert_str_eq!(&out, include_format_output!("1-no-comments.toml"));
+    }
+}

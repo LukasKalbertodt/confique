@@ -30,3 +30,6 @@ confique-macro = { version = "=0.0.2", path = "macro" }
 serde = { version = "1", features = ["derive"] }
 serde_yaml = { version = "0.8", optional = true }
 toml = { version = "0.5", optional = true }
+
+[dev-dependencies]
+pretty_assertions = "1.2.1"

@@ -186,6 +186,9 @@ pub mod toml;
 #[cfg(feature = "yaml")]
 pub mod yaml;
 
+#[cfg(test)]
+mod test_utils;
+
 
 pub use serde;
 pub use self::{
