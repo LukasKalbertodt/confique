@@ -80,6 +80,7 @@ impl Default for FormatOptions {
 ///         ## Required! This value must be specified.\n\
 ///         ##color =\n\
 ///         \n\
+///         \n\
 ///         [log]\n\
 ///         ## If set to `true`, the app will log to stdout.\n\
 ///         ##\n\
@@ -127,43 +128,54 @@ fn format_impl(
         }};
     }
 
-    if !path.is_empty() {
-        add_empty_line(s);
-        emit!("[{}]", path.join("."));
-    }
-
-    let leaf_fields = meta.fields.iter().filter(|f| matches!(&f.kind, FieldKind::Leaf { .. }));
-    let nested_fields = meta.fields.iter().filter(|f| matches!(&f.kind, FieldKind::Nested { .. }));
-
-    for field in leaf_fields.chain(nested_fields) {
+    // Output all leaf fields first
+    let leaf_fields = meta.fields.iter().filter_map(|f| match &f.kind {
+        FieldKind::Leaf { kind, env } => Some((f, kind, env)),
+        _ => None,
+    });
+    for (field, kind, _env) in leaf_fields {
         if options.comments {
             field.doc.iter().for_each(|doc| emit!("#{}", doc));
         }
 
-        match &field.kind {
-            FieldKind::Leaf { kind: LeafKind::Required { default }, .. } => {
-                // Emit comment about default value or the value being required
-                if options.comments {
-                    if !field.doc.is_empty() {
-                        emit!("#");
-                    }
-                    emit!("# {}", DefaultValueComment(default.as_ref().map(PrintExpr)));
+        if let LeafKind::Required { default } = kind {
+            // Emit comment about default value or the value being required
+            if options.comments {
+                if !field.doc.is_empty() {
+                    emit!("#");
                 }
-
-                // Emit the actual line with the name and optional value
-                match default {
-                    Some(v) => emit!("#{} = {}", field.name, PrintExpr(v)),
-                    None => emit!("#{} =", field.name),
-                }
+                emit!("# {}", DefaultValueComment(default.as_ref().map(PrintExpr)));
             }
 
-            FieldKind::Leaf { kind: LeafKind::Optional, .. } => emit!("#{} =", field.name),
-
-            FieldKind::Nested { meta } => {
-                let child_path = path.iter().copied().chain([field.name]).collect();
-                format_impl(s, meta, child_path, options);
+            // Emit the actual line with the name and optional value
+            match default {
+                Some(v) => emit!("#{} = {}", field.name, PrintExpr(v)),
+                None => emit!("#{} =", field.name),
             }
+        } else {
+            emit!("#{} =", field.name);
         }
+
+        if options.comments {
+            add_empty_line(s);
+        }
+    }
+
+    // Then all nested fields recursively
+    let nested_fields = meta.fields.iter().filter_map(|f| match &f.kind {
+        FieldKind::Nested { meta } => Some((f, meta)),
+        _ => None,
+    });
+    for (field, meta) in nested_fields {
+        emit!("");
+        // add_empty_line(s);
+        if options.comments {
+            field.doc.iter().for_each(|doc| emit!("#{}", doc));
+        }
+
+        let child_path = path.iter().copied().chain([field.name]).collect::<Vec<_>>();
+        emit!("[{}]", child_path.join("."));
+        format_impl(s, meta, child_path, options);
 
         if options.comments {
             add_empty_line(s);
