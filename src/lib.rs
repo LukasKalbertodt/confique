@@ -250,9 +250,9 @@ pub use crate::file::{File, FileFormat};
 ///   implement `Config`. As implied by the previous statement, `Option<_>` as
 ///   type for nested fields is not allowed.
 ///
-/// - **Leaf fields**: all fields *not* annotated with `#[config
-///   (nested)]`, these contain your actual values. The type of such a field
-///   has to implement `serde::Deserialize`.
+/// - **Leaf fields**: all fields *not* annotated with `#[config(nested)]`,
+///   these contain your actual values. The type of such a field has to
+///   implement `serde::Deserialize`.
 ///
 /// Doc comments on the struct and the individual fields are interpreted and
 /// stored in [`Meta`][meta::Meta]. They are used in the formatting functions
