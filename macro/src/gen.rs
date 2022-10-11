@@ -94,7 +94,6 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
                 let attr = match deserialize_with {
                     None => quote! {},
                     Some(p) => {
-                        // let s = p.to_token_stream().to_string();
                         let fn_name = deserialize_fn_name(&f.name).to_string();
                         quote_spanned! {p.span()=>
                             #[serde(default, deserialize_with = #fn_name)]
