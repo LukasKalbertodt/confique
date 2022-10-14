@@ -2,21 +2,16 @@
 
 use std::fmt;
 
-use serde::de::{Error as _, IntoDeserializer};
+use serde::de::IntoDeserializer;
 
 
-pub(crate) fn deserialize<'de, T: serde::Deserialize<'de>>(
-    value: Option<String>,
-) -> Result<T, DeError> {
-    let mut deserializer = Deserializer { value };
-    T::deserialize(&mut deserializer)
-}
-
-
-/// Private error type only for deserialization. Gets converted into
-/// `ErrorKind::EnvDeserialization` before reaching the public API.
+/// Error type only for deserialization of env values.
+///
+/// Semantically private, only public as it's used in the API of the `internal`
+/// module. Gets converted into `ErrorKind::EnvDeserialization` before reaching
+/// the real public API.
 #[derive(PartialEq)]
-pub(crate) struct DeError(pub(crate) String);
+pub struct DeError(pub(crate) String);
 
 impl std::error::Error for DeError {}
 
@@ -42,14 +37,14 @@ impl serde::de::Error for DeError {
 }
 
 
-/// Deserializer type.
-struct Deserializer {
-    value: Option<String>,
+/// Deserializer type. Semantically private (see `DeError`).
+pub struct Deserializer {
+    value: String,
 }
 
 impl Deserializer {
-    fn need_value(&mut self) -> Result<String, DeError> {
-        self.value.take().ok_or_else(|| DeError::custom("environment variable not set"))
+    pub(crate) fn new(value: String) -> Self {
+        Self { value }
     }
 }
 
@@ -59,8 +54,8 @@ macro_rules! deserialize_via_parse {
         where
             V: serde::de::Visitor<'de>
         {
-            let s = self.need_value()?;
-            let v = s.trim().parse().map_err(|e| {
+            let s = self.value.trim();
+            let v = s.parse().map_err(|e| {
                 DeError(format!(
                     concat!("invalid value '{}' for type ", stringify!($int), ": {}"),
                     s,
@@ -72,24 +67,21 @@ macro_rules! deserialize_via_parse {
     };
 }
 
-impl<'de> serde::Deserializer<'de> for &mut Deserializer {
+impl<'de> serde::Deserializer<'de> for Deserializer {
     type Error = DeError;
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: serde::de::Visitor<'de>
     {
-        match self.value.take() {
-            None => visitor.visit_none(),
-            Some(s) => s.into_deserializer().deserialize_any(visitor),
-        }
+        self.value.into_deserializer().deserialize_any(visitor)
     }
 
     fn deserialize_bool<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: serde::de::Visitor<'de>
     {
-        let v = match self.need_value()?.trim() {
+        let v = match self.value.trim() {
             "1" | "true" | "TRUE" => true,
             "0" | "false" | "FALSE" => false,
             other => return Err(DeError(format!("invalid value for bool: '{}'", other))),
@@ -120,21 +112,12 @@ impl<'de> serde::Deserializer<'de> for &mut Deserializer {
         visitor.visit_newtype_struct(self)
     }
 
-    fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: serde::de::Visitor<'de>
-    {
-        match self.value {
-            None => visitor.visit_none(),
-            Some(_) => visitor.visit_some(self),
-        }
-    }
-
     serde::forward_to_deserialize_any! {
         char str string
         bytes byte_buf
         unit unit_struct
         map
+        option
         struct
         identifier
         ignored_any
@@ -151,50 +134,36 @@ impl<'de> serde::Deserializer<'de> for &mut Deserializer {
 mod tests {
     use super::*;
 
-    fn de<'de, T: serde::Deserialize<'de>>(v: impl Into<Option<&'static str>>) -> Result<T, DeError> {
-        deserialize(v.into().map(|s| s.to_owned()))
+    fn de<'de, T: serde::Deserialize<'de>>(v: &'static str) -> Result<T, DeError> {
+        T::deserialize(Deserializer { value: v.into() })
     }
 
 
     #[test]
     fn boolean() {
-        assert_eq!(de("1"), Ok(Some(true)));
-        assert_eq!(de("true "), Ok(Some(true)));
-        assert_eq!(de("  TRUE"), Ok(Some(true)));
-        assert_eq!(de("0  "), Ok(Some(false)));
-        assert_eq!(de(" false"), Ok(Some(false)));
-        assert_eq!(de("FALSE "), Ok(Some(false)));
-
-        assert_eq!(de(None), Ok(Option::<bool>::None));
+        assert_eq!(de("1"), Ok(true));
+        assert_eq!(de("true "), Ok(true));
+        assert_eq!(de("  TRUE"), Ok(true));
+        assert_eq!(de("0  "), Ok(false));
+        assert_eq!(de(" false"), Ok(false));
+        assert_eq!(de("FALSE "), Ok(false));
     }
 
     #[test]
     fn ints() {
-        assert_eq!(de("0"), Ok(Some(0u8)));
-        assert_eq!(de("-1 "), Ok(Some(-1i8)));
-        assert_eq!(de(" 27"), Ok(Some(27u16)));
-        assert_eq!(de("-27"), Ok(Some(-27i16)));
-        assert_eq!(de("   4301"), Ok(Some(4301u32)));
-        assert_eq!(de(" -123456"), Ok(Some(-123456i32)));
-        assert_eq!(de(" 986543210    "), Ok(Some(986543210u64)));
-        assert_eq!(de("-986543210"), Ok(Some(-986543210i64)));
-
-        assert_eq!(de(None), Ok(Option::<i8>::None));
-        assert_eq!(de(None), Ok(Option::<u8>::None));
-        assert_eq!(de(None), Ok(Option::<i16>::None));
-        assert_eq!(de(None), Ok(Option::<u16>::None));
-        assert_eq!(de(None), Ok(Option::<i32>::None));
-        assert_eq!(de(None), Ok(Option::<u32>::None));
-        assert_eq!(de(None), Ok(Option::<i64>::None));
-        assert_eq!(de(None), Ok(Option::<u64>::None));
+        assert_eq!(de("0"), Ok(0u8));
+        assert_eq!(de("-1 "), Ok(-1i8));
+        assert_eq!(de(" 27"), Ok(27u16));
+        assert_eq!(de("-27"), Ok(-27i16));
+        assert_eq!(de("   4301"), Ok(4301u32));
+        assert_eq!(de(" -123456"), Ok(-123456i32));
+        assert_eq!(de(" 986543210    "), Ok(986543210u64));
+        assert_eq!(de("-986543210"), Ok(-986543210i64));
     }
 
     #[test]
     fn floats() {
-        assert_eq!(de("3.1415"), Ok(Some(3.1415f32)));
-        assert_eq!(de("-123.456"), Ok(Some(-123.456f64)));
-
-        assert_eq!(de(None), Ok(Option::<f32>::None));
-        assert_eq!(de(None), Ok(Option::<f64>::None));
+        assert_eq!(de("3.1415"), Ok(3.1415f32));
+        assert_eq!(de("-123.456"), Ok(-123.456f64));
     }
 }

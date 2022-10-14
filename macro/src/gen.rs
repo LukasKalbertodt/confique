@@ -152,10 +152,15 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
 
     let from_env_fields = input.fields.iter().map(|f| {
         match &f.kind {
-            FieldKind::Leaf { env: Some(key), .. } => {
+            FieldKind::Leaf { env: Some(key), deserialize_with, .. } => {
                 let field = format!("{}::{}", input.name, f.name);
-                quote! {
-                    confique::internal::from_env(#key, #field)?
+                match deserialize_with {
+                    None => quote! {
+                        confique::internal::from_env(#key, #field)?
+                    },
+                    Some(d) => quote! {
+                        confique::internal::from_env_with(#key, #field, #d)?
+                    },
                 }
             }
             FieldKind::Leaf { .. } => quote! { None },

@@ -34,6 +34,12 @@ pub(crate) enum ErrorInner {
         err: Box<dyn std::error::Error + Send + Sync>,
     },
 
+    /// When the env variable `key` is not Unicode.
+    EnvNotUnicode {
+        field: String,
+        key: String,
+    },
+
     /// When deserialization via `env` fails. The string is what is passed to
     /// `serde::de::Error::custom`.
     EnvDeserialization {
@@ -72,6 +78,7 @@ impl std::error::Error for Error {
             #[cfg(any(feature = "toml", feature = "yaml"))]
             ErrorInner::Deserialization { err, .. } => Some(&**err),
             ErrorInner::MissingValue(_) => None,
+            ErrorInner::EnvNotUnicode { .. } => None,
             ErrorInner::EnvDeserialization { .. } => None,
             #[cfg(any(feature = "toml", feature = "yaml"))]
             ErrorInner::UnsupportedFileFormat { .. } => None,
@@ -107,6 +114,14 @@ impl fmt::Display for Error {
             #[cfg(any(feature = "toml", feature = "yaml"))]
             ErrorInner::Deserialization { source: None, .. } => {
                 std::write!(f, "failed to deserialize configuration")
+            }
+            ErrorInner::EnvNotUnicode { field, key } => {
+                std::write!(f,
+                    "failed to load value `{}` from environment variable `{}`: \
+                        value is not valid unicode",
+                    field,
+                    key,
+                )
             }
             ErrorInner::EnvDeserialization { field, key, msg } => {
                 std::write!(f,

@@ -32,12 +32,33 @@ pub fn prepend_missing_value_error(e: Error, prefix: &str) -> Error {
     }
 }
 
-pub fn from_env<'de, T: serde::Deserialize<'de>>(key: &str, field: &str) -> Result<T, Error> {
-    crate::env::deserialize(std::env::var(key).ok()).map_err(|e| {
-        ErrorInner::EnvDeserialization {
+pub fn from_env<'de, T: serde::Deserialize<'de>>(
+    key: &str,
+    field: &str,
+) -> Result<Option<T>, Error> {
+    from_env_with(key, field, |de| T::deserialize(de))
+}
+
+pub fn from_env_with<T>(
+    key: &str,
+    field: &str,
+    deserialize: fn(crate::env::Deserializer) -> Result<T, crate::env::DeError>,
+) -> Result<Option<T>, Error> {
+    let s = match std::env::var(key) {
+        Err(std::env::VarError::NotPresent) => return Ok(None),
+        Err(std::env::VarError::NotUnicode(_)) => return Err(ErrorInner::EnvNotUnicode {
+            key: key.into(),
+            field: field.into(),
+        }.into()),
+        Ok(s) => s,
+    };
+
+    match deserialize(crate::env::Deserializer::new(s)) {
+        Ok(v) => Ok(Some(v)),
+        Err(e) => Err(ErrorInner::EnvDeserialization {
             key: key.into(),
             field: field.into(),
             msg: e.0,
-        }.into()
-    })
+        }.into()),
+    }
 }
