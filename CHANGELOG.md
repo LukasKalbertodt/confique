@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+
+## [0.1.4] - 2022-10-14
+### Fixed
+- Derive attribute `env` can now be used together with `deserialize_with` (#2)
+
 ## [0.1.3] - 2022-04-07
 ### Fixed
 - Derive macro does not product unparsable output anymore if the visibility
@@ -34,7 +39,8 @@ All notable changes to this project will be documented in this file.
 - Everything.
 
 
-[Unreleased]: https://github.com/LukasKalbertodt/confique/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/LukasKalbertodt/confique/compare/v0.1.4...HEAD
+[0.1.4]: https://github.com/LukasKalbertodt/confique/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/LukasKalbertodt/confique/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/LukasKalbertodt/confique/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/LukasKalbertodt/confique/compare/v0.1.0...v0.1.1
