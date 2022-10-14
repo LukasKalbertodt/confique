@@ -84,7 +84,7 @@ impl<'de> serde::Deserializer<'de> for Deserializer {
         let v = match self.value.trim() {
             "1" | "true" | "TRUE" => true,
             "0" | "false" | "FALSE" => false,
-            other => return Err(DeError(format!("invalid value for bool: '{}'", other))),
+            other => return Err(DeError(format!("invalid value for bool: '{other}'"))),
         };
 
         visitor.visit_bool(v)

@@ -25,7 +25,7 @@ impl<T: fmt::Display> fmt::Display for DefaultValueComment<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.0 {
             None => "Required! This value must be specified.".fmt(f),
-            Some(v) => write!(f, "Default value: {}", v),
+            Some(v) => write!(f, "Default value: {v}"),
         }
     }
 }

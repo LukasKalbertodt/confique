@@ -94,7 +94,7 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match &*self.inner {
             ErrorInner::MissingValue(path) => {
-                std::write!(f, "required configuration value is missing: '{}'", path)
+                std::write!(f, "required configuration value is missing: '{path}'")
             }
             #[cfg(any(feature = "toml", feature = "yaml"))]
             ErrorInner::Io { path: Some(path), .. } => {
@@ -109,27 +109,19 @@ impl fmt::Display for Error {
             }
             #[cfg(any(feature = "toml", feature = "yaml"))]
             ErrorInner::Deserialization { source: Some(source), .. } => {
-                std::write!(f, "failed to deserialize configuration from {}", source)
+                std::write!(f, "failed to deserialize configuration from {source}")
             }
             #[cfg(any(feature = "toml", feature = "yaml"))]
             ErrorInner::Deserialization { source: None, .. } => {
                 std::write!(f, "failed to deserialize configuration")
             }
             ErrorInner::EnvNotUnicode { field, key } => {
-                std::write!(f,
-                    "failed to load value `{}` from environment variable `{}`: \
-                        value is not valid unicode",
-                    field,
-                    key,
-                )
+                std::write!(f, "failed to load value `{field}` from \
+                    environment variable `{key}`: value is not valid unicode")
             }
             ErrorInner::EnvDeserialization { field, key, msg } => {
-                std::write!(f,
-                    "failed to deserialize value `{}` from environment variable `{}`: {}",
-                    field,
-                    key,
-                    msg,
-                )
+                std::write!(f, "failed to deserialize value `{field}` from \
+                    environment variable `{key}`: {msg}")
             }
             #[cfg(any(feature = "toml", feature = "yaml"))]
             ErrorInner::UnsupportedFileFormat { path } => {

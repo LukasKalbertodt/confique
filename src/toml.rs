@@ -99,7 +99,7 @@ pub fn format<C: Config>(options: FormatOptions) -> String {
 
     // Print root docs.
     if options.comments {
-        meta.doc.iter().for_each(|doc| writeln!(out, "#{}", doc).unwrap());
+        meta.doc.iter().for_each(|doc| writeln!(out, "#{doc}").unwrap());
         if !meta.doc.is_empty() {
             add_empty_line(&mut out);
         }
@@ -135,7 +135,7 @@ fn format_impl(
     });
     for (field, kind, _env) in leaf_fields {
         if options.comments {
-            field.doc.iter().for_each(|doc| emit!("#{}", doc));
+            field.doc.iter().for_each(|doc| emit!("#{doc}"));
         }
 
         if let LeafKind::Required { default } = kind {
@@ -170,7 +170,7 @@ fn format_impl(
         emit!("");
         // add_empty_line(s);
         if options.comments {
-            field.doc.iter().for_each(|doc| emit!("#{}", doc));
+            field.doc.iter().for_each(|doc| emit!("#{doc}"));
         }
 
         let child_path = path.iter().copied().chain([field.name]).collect::<Vec<_>>();

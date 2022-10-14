@@ -100,7 +100,7 @@ pub fn format<C: Config>(options: FormatOptions) -> String {
 
     // Print root docs.
     if options.comments {
-        meta.doc.iter().for_each(|doc| writeln!(out, "#{}", doc).unwrap());
+        meta.doc.iter().for_each(|doc| writeln!(out, "#{doc}").unwrap());
         if !meta.doc.is_empty() {
             add_empty_line(&mut out);
         }
@@ -131,7 +131,7 @@ fn format_impl(
 
     for field in meta.fields {
         if options.comments {
-            field.doc.iter().for_each(|doc| emit!("#{}", doc));
+            field.doc.iter().for_each(|doc| emit!("#{doc}"));
         }
 
         match &field.kind {

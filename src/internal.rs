@@ -26,7 +26,7 @@ pub fn missing_value_error(path: String) -> Error {
 pub fn prepend_missing_value_error(e: Error, prefix: &str) -> Error {
     match *e.inner {
         ErrorInner::MissingValue(path) => {
-            ErrorInner::MissingValue(format!("{}.{}", prefix, path)).into()
+            ErrorInner::MissingValue(format!("{prefix}.{path}")).into()
         }
         e => e.into(),
     }

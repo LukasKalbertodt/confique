@@ -248,7 +248,7 @@ fn extract_internal_attrs(
             macro_rules! duplicate_if {
                 ($cond:expr) => {
                     if $cond {
-                        let msg = format!("duplicate '{}' confique attribute", keyword);
+                        let msg = format!("duplicate '{keyword}' confique attribute");
                         return Err(Error::new(attr.tokens.span(), msg));
                     }
                 };
