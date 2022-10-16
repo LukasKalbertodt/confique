@@ -377,7 +377,7 @@ fn gen_meta_default(default: &Option<Expr>, ty: &syn::Type) -> TokenStream {
         default: &str,
         map: fn(&str) -> Option<&'static str>,
     ) -> Ident {
-        let variant = int_type_to_variant(suffix)
+        let variant = map(suffix)
             .or_else(|| {
                 if let syn::Type::Path(syn::TypePath { qself: None, path }) = field_ty {
                     path.get_ident().and_then(|i| map(&i.to_string()))
