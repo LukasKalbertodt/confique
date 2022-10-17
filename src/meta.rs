@@ -8,7 +8,7 @@ use core::fmt;
 // additions without breaking stuff.
 
 /// Root type.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Meta {
     /// The type (struct) name.
     pub name: &'static str,
@@ -19,14 +19,14 @@ pub struct Meta {
     pub fields: &'static [Field],
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Field {
     pub name: &'static str,
     pub doc: &'static [&'static str],
     pub kind: FieldKind,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum FieldKind {
     Leaf {
         env: Option<&'static str>,
@@ -37,7 +37,7 @@ pub enum FieldKind {
     },
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum LeafKind {
     /// A leaf field with a non `Option<_>` type.
     Required {
@@ -47,7 +47,7 @@ pub enum LeafKind {
     Optional,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Expr {
     Str(&'static str),
     Float(Float),
