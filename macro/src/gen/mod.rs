@@ -72,7 +72,8 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
     let visibility = &input.visibility;
 
     fn deserialize_fn_name(field_name: &Ident) -> Ident {
-        quote::format_ident!("deserialize_{field_name}")
+        // This has an ugly name to avoid clashing with imported names.
+        quote::format_ident!("__confique_deserialize_{field_name}")
     }
 
     // Prepare some tokens per field.
