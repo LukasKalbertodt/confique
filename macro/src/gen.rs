@@ -1,5 +1,5 @@
 use proc_macro2::{Span, TokenStream};
-use quote::{ToTokens, format_ident, quote, quote_spanned};
+use quote::{format_ident, quote, quote_spanned};
 use syn::{Ident, spanned::Spanned};
 
 use crate::ir::{self, Expr, FieldKind, LeafKind};
@@ -135,13 +135,14 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
                     input.name,
                     f.name,
                 );
+                let expr = default_deserialize_expr(&default);
 
                 match deserialize_with {
                     None => quote! {
-                        Some(confique::internal::deserialize_default(#default).expect(#msg))
+                        Some(confique::internal::deserialize_default(#expr).expect(#msg))
                     },
                     Some(p) => quote! {
-                        Some(#p(confique::internal::into_deserializer(#default)).expect(#msg))
+                        Some(#p(confique::internal::into_deserializer(#expr)).expect(#msg))
                     },
                 }
             }
@@ -308,7 +309,13 @@ fn gen_meta(input: &ir::Input) -> TokenStream {
             }
             FieldKind::Leaf { env, kind: LeafKind::Required { default, ty, .. }, ..} => {
                 let env = env_tokens(env);
-                let default_value = gen_meta_default(default, &ty);
+                let default_value = match default {
+                    Some(default) => {
+                        let meta = gen_meta_default(default, Some(&ty));
+                        quote! { Some(#meta) }
+                    },
+                    None => quote! { None },
+                };
                 quote! {
                     confique::meta::FieldKind::Leaf {
                         env: #env,
@@ -340,7 +347,7 @@ fn gen_meta(input: &ir::Input) -> TokenStream {
 
 /// Generates the meta expression of type `meta::Expr` to be used for the
 /// `default` field.
-fn gen_meta_default(default: &Option<Expr>, ty: &syn::Type) -> TokenStream {
+fn gen_meta_default(default: &Expr, ty: Option<&syn::Type>) -> TokenStream {
     fn int_type_to_variant(suffix: &str) -> Option<&'static str> {
         match suffix {
             "u8" => Some("U8"),
@@ -373,13 +380,13 @@ fn gen_meta_default(default: &Option<Expr>, ty: &syn::Type) -> TokenStream {
     // that. Otherwise we use a default.
     fn infer_type(
         suffix: &str,
-        field_ty: &syn::Type,
+        field_ty: Option<&syn::Type>,
         default: &str,
         map: fn(&str) -> Option<&'static str>,
     ) -> Ident {
         let variant = map(suffix)
             .or_else(|| {
-                if let syn::Type::Path(syn::TypePath { qself: None, path }) = field_ty {
+                if let Some(syn::Type::Path(syn::TypePath { qself: None, path })) = field_ty {
                     path.get_ident().and_then(|i| map(&i.to_string()))
                 } else {
                     None
@@ -390,35 +397,75 @@ fn gen_meta_default(default: &Option<Expr>, ty: &syn::Type) -> TokenStream {
         Ident::new(variant, Span::call_site())
     }
 
+    /// Tries to extract the type of the item of a field with an array default value.
+    fn get_item_ty(ty: &syn::Type) -> Option<&syn::Type> {
+        match ty {
+            syn::Type::Slice(slice) => Some(&slice.elem),
+            syn::Type::Array(array) => Some(&*array.elem),
+            syn::Type::Path(p) => {
+                // This is the least clear case. We certainly want to cover
+                // `Vec<T>` but ideally some more cases. On the other hand, we
+                // just can't really know, so some incorrect guesses are
+                // definitely expected here. Most are likely filtered out by
+                // applying `gen_meta_default` to it, but some will result in a
+                // wrong default value type. But people can always just add a
+                // prefix to the literal in those cases.
+                //
+                // We simply check if the last element in the path has exactly
+                // one generic type argument, in which case we use that.
+                let args = match &p.path.segments.last().expect("empty type path").arguments {
+                    syn::PathArguments::AngleBracketed(args) => &args.args,
+                    _ => return None,
+                };
 
-    if let Some(default) = default {
-        let v = match default {
-            Expr::Bool(v) => quote! { confique::meta::Expr::Bool(#v) },
-            Expr::Str(s) => quote! { confique::meta::Expr::Str(#s) },
-            Expr::Int(i) => {
-                let variant = infer_type(i.suffix(), ty, "I32", int_type_to_variant);
-                quote! { confique::meta::Expr::Integer(confique::meta::Integer::#variant(#i)) }
-            }
-            Expr::Float(f) => {
-                let variant = infer_type(f.suffix(), ty, "F64", float_type_to_variant);
-                quote! { confique::meta::Expr::Float(confique::meta::Float::#variant(#f)) }
-            }
-        };
+                if args.len() != 1 {
+                    return None;
+                }
 
-        quote! { Some(#v) }
-    } else {
-        quote! { None }
+                match &args[0] {
+                    syn::GenericArgument::Type(t) => Some(t),
+                    _ => None,
+                }
+            },
+            syn::Type::Reference(r) => get_item_ty(&r.elem),
+            syn::Type::Group(g) => get_item_ty(&g.elem),
+            syn::Type::Paren(p) => get_item_ty(&p.elem),
+            _ => None,
+        }
     }
+
+
+    let v = match default {
+        Expr::Bool(v) => quote! { confique::meta::Expr::Bool(#v) },
+        Expr::Str(s) => quote! { confique::meta::Expr::Str(#s) },
+        Expr::Int(i) => {
+            let variant = infer_type(i.suffix(), ty, "I32", int_type_to_variant);
+            quote! { confique::meta::Expr::Integer(confique::meta::Integer::#variant(#i)) }
+        }
+        Expr::Float(f) => {
+            let variant = infer_type(f.suffix(), ty, "F64", float_type_to_variant);
+            quote! { confique::meta::Expr::Float(confique::meta::Float::#variant(#f)) }
+        }
+        Expr::Array(items) => {
+            let item_type = ty.and_then(get_item_ty);
+            let items = items.iter().map(|item| gen_meta_default(item, item_type));
+            quote! { confique::meta::Expr::Array(&[#( #items ),*]) }
+        }
+    };
+
+    quote! { #v }
 }
 
-impl ToTokens for ir::Expr {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        match self {
-            Self::Str(lit) => lit.to_tokens(tokens),
-            Self::Int(lit) => lit.to_tokens(tokens),
-            Self::Float(lit) => lit.to_tokens(tokens),
-            Self::Bool(lit) => lit.to_tokens(tokens),
-        }
+fn default_deserialize_expr(expr: &ir::Expr) -> TokenStream {
+    match expr {
+        ir::Expr::Str(lit) => quote! { #lit },
+        ir::Expr::Int(lit) => quote! { #lit },
+        ir::Expr::Float(lit) => quote! { #lit },
+        ir::Expr::Bool(lit) => quote! { #lit },
+        ir::Expr::Array(arr) => {
+            let items = arr.iter().map(default_deserialize_expr);
+            quote! { confique::internal::ArrayIntoDeserializer([ #(#items),* ]) }
+        },
     }
 }
 

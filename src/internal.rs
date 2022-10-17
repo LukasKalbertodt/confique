@@ -62,3 +62,19 @@ pub fn from_env_with<T>(
         }.into()),
     }
 }
+
+/// `serde` does not implement `IntoDeserializer` for fixed size arrays. This
+/// helper type is just used for this purpose.
+pub struct ArrayIntoDeserializer<T, const N: usize>(pub [T; N]);
+
+impl<'de, T, E, const N: usize> serde::de::IntoDeserializer<'de, E> for ArrayIntoDeserializer<T, N>
+where
+    T: serde::de::IntoDeserializer<'de, E>,
+    E: serde::de::Error,
+{
+    type Deserializer = serde::de::value::SeqDeserializer<std::array::IntoIter<T, N>, E>;
+
+    fn into_deserializer(self) -> Self::Deserializer {
+        serde::de::value::SeqDeserializer::new(self.0.into_iter())
+    }
+}

@@ -1,6 +1,6 @@
 //! Definition of the intermediate representation.
 
-use syn::{Error, Token, parse::{Parse, ParseStream}, spanned::Spanned};
+use syn::{Error, Token, parse::{Parse, ParseStream}, spanned::Spanned, punctuated::Punctuated};
 
 use crate::util::{is_option, unwrap_option};
 
@@ -70,7 +70,7 @@ pub(crate) enum Expr {
     Int(syn::LitInt),
     Float(syn::LitFloat),
     Bool(syn::LitBool),
-    // TODO: arrays?
+    Array(Vec<Expr>),
 }
 
 impl Input {
@@ -173,17 +173,26 @@ impl Field {
     }
 }
 
-impl Expr {
-    fn from_lit(lit: syn::Lit) -> Result<Self, Error> {
-        match lit {
-            syn::Lit::Str(l) => Ok(Self::Str(l)),
-            syn::Lit::Int(l) => Ok(Self::Int(l)),
-            syn::Lit::Float(l) => Ok(Self::Float(l)),
-            syn::Lit::Bool(l) => Ok(Self::Bool(l)),
+impl Parse for Expr {
+    fn parse(input: ParseStream) -> Result<Self, syn::Error> {
+        let msg = "invalid default value. Allowed are only: certain literals \
+            (string, integer, float, bool), and arrays";
 
-            _ => {
-                let msg = "only string, integer, float and bool literals are allowed here";
-                Err(Error::new(lit.span(), msg))
+        if input.peek(syn::token::Bracket) {
+            let content;
+            syn::bracketed!(content in input);
+
+            let items = <Punctuated<Expr, Token![,]>>::parse_terminated(&content)?;
+            Ok(Self::Array(items.into_iter().collect()))
+        } else {
+            let lit: syn::Lit = input.parse()
+                .map_err(|_| Error::new(input.span(), msg))?;
+            match lit {
+                syn::Lit::Str(l) => Ok(Self::Str(l)),
+                syn::Lit::Int(l) => Ok(Self::Int(l)),
+                syn::Lit::Float(l) => Ok(Self::Float(l)),
+                syn::Lit::Bool(l) => Ok(Self::Bool(l)),
+                _ => Err(Error::new(lit.span(), msg)),
             }
         }
     }
@@ -239,7 +248,7 @@ fn extract_internal_attrs(
 
     let mut out = InternalAttrs::default();
     for attr in internal_attrs {
-        type AttrList = syn::punctuated::Punctuated<InternalAttr, Token![,]>;
+        type AttrList = Punctuated<InternalAttr, Token![,]>;
         let parsed_list = attr.parse_args_with(AttrList::parse_terminated)?;
 
         for parsed in parsed_list {
@@ -315,7 +324,7 @@ impl Parse for InternalAttr {
 
             "default" => {
                 let _: Token![=] = input.parse()?;
-                let expr = Expr::from_lit(input.parse()?)?;
+                let expr: Expr = input.parse()?;
                 assert_empty_or_comma(input)?;
                 Ok(Self::Default(expr))
             }

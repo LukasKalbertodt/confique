@@ -53,6 +53,7 @@ pub enum Expr {
     Float(Float),
     Integer(Integer),
     Bool(bool),
+    Array(&'static [Expr]),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]

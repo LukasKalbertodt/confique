@@ -184,6 +184,18 @@ impl fmt::Display for PrintExpr {
             Expr::Float(v) => v.fmt(f),
             Expr::Integer(v) => v.fmt(f),
             Expr::Bool(v) => v.fmt(f),
+            Expr::Array(items) => {
+                // TODO: pretty printing of long arrays onto multiple lines?
+                f.write_char('[')?;
+                for (i, item) in items.iter().enumerate() {
+                    if i != 0 {
+                        f.write_str(", ")?;
+                    }
+                    PrintExpr(item).fmt(f)?;
+                }
+                f.write_char(']')?;
+                Ok(())
+            }
         }
     }
 }
