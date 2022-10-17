@@ -2,9 +2,12 @@ use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote, quote_spanned};
 use syn::{Ident, spanned::Spanned};
 
-use crate::ir::{self, Expr, FieldKind, LeafKind};
+use crate::ir::{self, FieldKind, LeafKind};
+
+mod meta;
 
 
+/// The main function to generate the output token stream from the parse IR.
 pub(crate) fn gen(input: ir::Input) -> TokenStream {
     let partial_mod = gen_partial_mod(&input);
     let config_impl = gen_config_impl(&input);
@@ -15,6 +18,7 @@ pub(crate) fn gen(input: ir::Input) -> TokenStream {
     }
 }
 
+/// Generates the `impl Config for ... { ... }`.
 fn gen_config_impl(input: &ir::Input) -> TokenStream {
     let name = &input.name;
     let (partial_mod_name, partial_struct_name) = partial_names(&input.name);
@@ -44,7 +48,7 @@ fn gen_config_impl(input: &ir::Input) -> TokenStream {
     });
 
 
-    let meta_item = gen_meta(input);
+    let meta_item = meta::gen(input);
     quote! {
         #[automatically_derived]
         impl confique::Config for #name {
@@ -61,17 +65,8 @@ fn gen_config_impl(input: &ir::Input) -> TokenStream {
     }
 }
 
-
-/// Returns the names of the module and struct for the partial type:
-/// `(mod_name, struct_name)`.
-fn partial_names(original_name: &Ident) -> (Ident, Ident) {
-    use heck::SnakeCase;
-    (
-        format_ident!("confique_partial_{}", original_name.to_string().to_snake_case()),
-        format_ident!("Partial{original_name}"),
-    )
-}
-
+/// Generates the whole `mod ... { ... }` that defines the partial type and
+/// related items.
 fn gen_partial_mod(input: &ir::Input) -> TokenStream {
     let (mod_name, struct_name) = partial_names(&input.name);
     let visibility = &input.visibility;
@@ -135,7 +130,7 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
                     input.name,
                     f.name,
                 );
-                let expr = default_deserialize_expr(&default);
+                let expr = default_value_to_deserializable_expr(&default);
 
                 match deserialize_with {
                     None => quote! {
@@ -277,198 +272,32 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
     }
 }
 
-
-/// Generates the whole `const META` item.
-fn gen_meta(input: &ir::Input) -> TokenStream {
-    fn env_tokens(env: &Option<String>) -> TokenStream {
-        match env {
-            Some(key) => quote! { Some(#key) },
-            None => quote! { None },
-        }
-    }
-
-    let name_str = input.name.to_string();
-    let doc = &input.doc;
-    let meta_fields = input.fields.iter().map(|f| {
-        let name = f.name.to_string();
-        let doc =  &f.doc;
-        let kind = match &f.kind {
-            FieldKind::Nested { ty }=> {
-                quote! {
-                    confique::meta::FieldKind::Nested { meta: &<#ty as confique::Config>::META }
-                }
-            }
-            FieldKind::Leaf { env, kind: LeafKind::Optional { .. }, ..} => {
-                let env = env_tokens(env);
-                quote! {
-                    confique::meta::FieldKind::Leaf {
-                        env: #env,
-                        kind: confique::meta::LeafKind::Optional,
-                    }
-                }
-            }
-            FieldKind::Leaf { env, kind: LeafKind::Required { default, ty, .. }, ..} => {
-                let env = env_tokens(env);
-                let default_value = match default {
-                    Some(default) => {
-                        let meta = gen_meta_default(default, Some(&ty));
-                        quote! { Some(#meta) }
-                    },
-                    None => quote! { None },
-                };
-                quote! {
-                    confique::meta::FieldKind::Leaf {
-                        env: #env,
-                        kind: confique::meta::LeafKind::Required {
-                            default: #default_value,
-                        },
-                    }
-                }
-            }
-        };
-
-        quote! {
-            confique::meta::Field {
-                name: #name,
-                doc: &[ #(#doc),* ],
-                kind: #kind,
-            }
-        }
-    });
-
-    quote! {
-        const META: confique::meta::Meta = confique::meta::Meta {
-            name: #name_str,
-            doc: &[ #(#doc),* ],
-            fields: &[ #( #meta_fields ),* ],
-        };
-    }
+/// Returns the names of the module and struct for the partial type:
+/// `(mod_name, struct_name)`.
+fn partial_names(original_name: &Ident) -> (Ident, Ident) {
+    use heck::SnakeCase;
+    (
+        format_ident!("confique_partial_{}", original_name.to_string().to_snake_case()),
+        format_ident!("Partial{original_name}"),
+    )
 }
 
-/// Generates the meta expression of type `meta::Expr` to be used for the
-/// `default` field.
-fn gen_meta_default(default: &Expr, ty: Option<&syn::Type>) -> TokenStream {
-    fn int_type_to_variant(suffix: &str) -> Option<&'static str> {
-        match suffix {
-            "u8" => Some("U8"),
-            "u16" => Some("U16"),
-            "u32" => Some("U32"),
-            "u64" => Some("U64"),
-            "u128" => Some("U128"),
-            "usize" => Some("Usize"),
-            "i8" => Some("I8"),
-            "i16" => Some("I16"),
-            "i32" => Some("I32"),
-            "i64" => Some("I64"),
-            "i128" => Some("I128"),
-            "isize" => Some("Isize"),
-            _ => None,
-        }
-    }
-
-    fn float_type_to_variant(suffix: &str) -> Option<&'static str> {
-        match suffix {
-            "f32" => Some("F32"),
-            "f64" => Some("F64"),
-            _ => None,
-        }
-    }
-
-    // To figure out the type of int or float literals, we first look at the
-    // type suffix of the literal. If it is specified, we use that. Otherwise
-    // we check if the field type is a known float/integer type. If so, we use
-    // that. Otherwise we use a default.
-    fn infer_type(
-        suffix: &str,
-        field_ty: Option<&syn::Type>,
-        default: &str,
-        map: fn(&str) -> Option<&'static str>,
-    ) -> Ident {
-        let variant = map(suffix)
-            .or_else(|| {
-                if let Some(syn::Type::Path(syn::TypePath { qself: None, path })) = field_ty {
-                    path.get_ident().and_then(|i| map(&i.to_string()))
-                } else {
-                    None
-                }
-            })
-            .unwrap_or(default);
-
-        Ident::new(variant, Span::call_site())
-    }
-
-    /// Tries to extract the type of the item of a field with an array default value.
-    fn get_item_ty(ty: &syn::Type) -> Option<&syn::Type> {
-        match ty {
-            syn::Type::Slice(slice) => Some(&slice.elem),
-            syn::Type::Array(array) => Some(&*array.elem),
-            syn::Type::Path(p) => {
-                // This is the least clear case. We certainly want to cover
-                // `Vec<T>` but ideally some more cases. On the other hand, we
-                // just can't really know, so some incorrect guesses are
-                // definitely expected here. Most are likely filtered out by
-                // applying `gen_meta_default` to it, but some will result in a
-                // wrong default value type. But people can always just add a
-                // prefix to the literal in those cases.
-                //
-                // We simply check if the last element in the path has exactly
-                // one generic type argument, in which case we use that.
-                let args = match &p.path.segments.last().expect("empty type path").arguments {
-                    syn::PathArguments::AngleBracketed(args) => &args.args,
-                    _ => return None,
-                };
-
-                if args.len() != 1 {
-                    return None;
-                }
-
-                match &args[0] {
-                    syn::GenericArgument::Type(t) => Some(t),
-                    _ => None,
-                }
-            },
-            syn::Type::Reference(r) => get_item_ty(&r.elem),
-            syn::Type::Group(g) => get_item_ty(&g.elem),
-            syn::Type::Paren(p) => get_item_ty(&p.elem),
-            _ => None,
-        }
-    }
-
-
-    let v = match default {
-        Expr::Bool(v) => quote! { confique::meta::Expr::Bool(#v) },
-        Expr::Str(s) => quote! { confique::meta::Expr::Str(#s) },
-        Expr::Int(i) => {
-            let variant = infer_type(i.suffix(), ty, "I32", int_type_to_variant);
-            quote! { confique::meta::Expr::Integer(confique::meta::Integer::#variant(#i)) }
-        }
-        Expr::Float(f) => {
-            let variant = infer_type(f.suffix(), ty, "F64", float_type_to_variant);
-            quote! { confique::meta::Expr::Float(confique::meta::Float::#variant(#f)) }
-        }
-        Expr::Array(items) => {
-            let item_type = ty.and_then(get_item_ty);
-            let items = items.iter().map(|item| gen_meta_default(item, item_type));
-            quote! { confique::meta::Expr::Array(&[#( #items ),*]) }
-        }
-    };
-
-    quote! { #v }
-}
-
-fn default_deserialize_expr(expr: &ir::Expr) -> TokenStream {
+/// Generates a Rust expression from the default value that implemenets
+/// `serde::de::IntoDeserializer`.
+fn default_value_to_deserializable_expr(expr: &ir::Expr) -> TokenStream {
     match expr {
         ir::Expr::Str(lit) => quote! { #lit },
         ir::Expr::Int(lit) => quote! { #lit },
         ir::Expr::Float(lit) => quote! { #lit },
         ir::Expr::Bool(lit) => quote! { #lit },
         ir::Expr::Array(arr) => {
-            let items = arr.iter().map(default_deserialize_expr);
+            let items = arr.iter().map(default_value_to_deserializable_expr);
             quote! { confique::internal::ArrayIntoDeserializer([ #(#items),* ]) }
         },
     }
 }
 
+/// Returns tokens defining the visibility of the items in the inner module.
 fn inner_visibility(outer: &syn::Visibility, span: Span) -> TokenStream {
     match outer {
         // These visibilities can be used as they are. No adjustment needed.
