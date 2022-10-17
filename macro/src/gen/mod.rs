@@ -30,9 +30,10 @@ fn gen_config_impl(input: &ir::Input) -> TokenStream {
         match f.kind {
             FieldKind::Nested { .. } => {
                 quote! {
-                    confique::Config::from_partial(partial.#field_name).map_err(|e| {
-                        confique::internal::prepend_missing_value_error(e, #path)
-                    })?
+                    confique::internal::map_err_prefix_path(
+                        confique::Config::from_partial(partial.#field_name),
+                        #path,
+                    )?
                 }
             }
             FieldKind::Leaf { kind: LeafKind::Optional { .. }, .. } => {
@@ -40,8 +41,7 @@ fn gen_config_impl(input: &ir::Input) -> TokenStream {
             }
             FieldKind::Leaf { kind: LeafKind::Required { .. }, .. } => {
                 quote! {
-                    partial.#field_name
-                        .ok_or(confique::internal::missing_value_error(#path.into()))?
+                    confique::internal::unwrap_or_missing_value_err(partial.#field_name, #path)?
                 }
             }
         }

@@ -19,17 +19,21 @@ where
     src.into_deserializer()
 }
 
-pub fn missing_value_error(path: String) -> Error {
-    ErrorInner::MissingValue(path).into()
+pub fn unwrap_or_missing_value_err<T>(value: Option<T>, path: &str) -> Result<T, Error> {
+    match value {
+        Some(v) => Ok(v),
+        None => Err(ErrorInner::MissingValue(path.into()).into())
+    }
 }
 
-pub fn prepend_missing_value_error(e: Error, prefix: &str) -> Error {
-    match *e.inner {
-        ErrorInner::MissingValue(path) => {
+pub fn map_err_prefix_path<T>(res: Result<T, Error>, prefix: &str) -> Result<T, Error> {
+    res.map_err(|e| {
+        if let ErrorInner::MissingValue(path) = &*e.inner {
             ErrorInner::MissingValue(format!("{prefix}.{path}")).into()
+        } else {
+            e
         }
-        e => e.into(),
-    }
+    })
 }
 
 pub fn from_env<'de, T: serde::Deserialize<'de>>(
