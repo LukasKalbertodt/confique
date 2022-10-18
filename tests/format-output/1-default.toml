@@ -10,6 +10,8 @@
 [http]
 # The port the server will listen on.
 #
+# Can also be specified via environment variable `PORT`.
+#
 # Required! This value must be specified.
 #port =
 

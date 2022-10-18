@@ -23,6 +23,16 @@ pub struct FormatOptions {
     /// true.
     pub comments: bool,
 
+    /// If `comments` and this field are `true`, leaf fields with `env = "FOO"`
+    /// attribute will have a line like this added:
+    ///
+    /// ```text
+    /// # Can also be specified via environment variable `FOO`.
+    /// ```
+    ///
+    /// Default: `true`.
+    pub env_keys: bool,
+
     // Potential future options:
     // - Comment out default values (`#foo = 3` vs `foo = 3`)
     // - Which docs to include from nested objects
@@ -33,6 +43,7 @@ impl Default for FormatOptions {
         Self {
             indent: 0,
             comments: true,
+            env_keys: true,
         }
     }
 }
@@ -46,6 +57,7 @@ impl Default for FormatOptions {
 /// # Example
 ///
 /// ```
+/// # use pretty_assertions::assert_eq;
 /// use std::path::PathBuf;
 /// use confique::{Config, toml::FormatOptions};
 ///
@@ -67,30 +79,35 @@ impl Default for FormatOptions {
 ///
 ///     /// If this is set, the app will write logs to the given file. Of course,
 ///     /// the app has to have write access to that file.
+///     #[config(env = "LOG_FILE")]
 ///     file: Option<PathBuf>,
 /// }
 ///
+/// const EXPECTED: &str = "\
+/// ## App configuration.
+///
+/// ## The color of the app.
+/// ##
+/// ## Required! This value must be specified.
+/// ##color =
+///
+///
+/// [log]
+/// ## If set to `true`, the app will log to stdout.
+/// ##
+/// ## Default value: true
+/// ##stdout = true
+///
+/// ## If this is set, the app will write logs to the given file. Of course,
+/// ## the app has to have write access to that file.
+/// ##
+/// ## Can also be specified via environment variable `LOG_FILE`.
+/// ##file =
+/// ";
+///
 /// fn main() {
 ///     let toml = confique::toml::format::<Conf>(FormatOptions::default());
-///     assert_eq!(toml, "\
-///         ## App configuration.\n\
-///         \n\
-///         ## The color of the app.\n\
-///         ##\n\
-///         ## Required! This value must be specified.\n\
-///         ##color =\n\
-///         \n\
-///         \n\
-///         [log]\n\
-///         ## If set to `true`, the app will log to stdout.\n\
-///         ##\n\
-///         ## Default value: true\n\
-///         ##stdout = true\n\
-///         \n\
-///         ## If this is set, the app will write logs to the given file. Of course,\n\
-///         ## the app has to have write access to that file.\n\
-///         ##file =\n\
-///     ");
+///     assert_eq!(toml, EXPECTED);
 /// }
 /// ```
 pub fn format<C: Config>(options: FormatOptions) -> String {
@@ -133,17 +150,30 @@ fn format_impl(
         FieldKind::Leaf { kind, env } => Some((f, kind, env)),
         _ => None,
     });
-    for (field, kind, _env) in leaf_fields {
+    for (field, kind, env) in leaf_fields {
+        let mut emitted_something = false;
+        macro_rules! empty_sep_doc_line {
+            () => {
+                if emitted_something {
+                    emit!("#");
+                }
+            };
+        }
+
         if options.comments {
             field.doc.iter().for_each(|doc| emit!("#{doc}"));
+            emitted_something = !field.doc.is_empty();
+
+            if let Some(env) = env {
+                empty_sep_doc_line!();
+                emit!("# Can also be specified via environment variable `{env}`.")
+            }
         }
 
         if let LeafKind::Required { default } = kind {
             // Emit comment about default value or the value being required
             if options.comments {
-                if !field.doc.is_empty() {
-                    emit!("#");
-                }
+                empty_sep_doc_line!();
                 emit!("# {}", DefaultValueComment(default.as_ref().map(PrintExpr)));
             }
 
@@ -226,6 +256,7 @@ mod tests {
         let out = format::<test_utils::example1::Conf>(FormatOptions {
             comments: false,
             indent: 0,
+            .. FormatOptions::default()
         });
         assert_str_eq!(&out, include_format_output!("1-no-comments.toml"));
     }
