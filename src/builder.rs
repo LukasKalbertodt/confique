@@ -1,9 +1,9 @@
-#[cfg(any(feature = "toml", feature = "yaml"))]
+#[cfg(any(feature = "toml", feature = "yaml", feature = "json5"))]
 use std::path::PathBuf;
 
 use crate::{Config, Error, Partial};
 
-#[cfg(any(feature = "toml", feature = "yaml"))]
+#[cfg(any(feature = "toml", feature = "yaml", feature = "json5"))]
 use crate::File;
 
 
@@ -30,7 +30,7 @@ impl<C: Config> Builder<C> {
     ///
     /// The file is not considered required: if the file does not exist, an
     /// empty configuration (`C::Partial::empty()`) is used for this layer.
-    #[cfg(any(feature = "toml", feature = "yaml"))]
+    #[cfg(any(feature = "toml", feature = "yaml", feature = "json5"))]
     pub fn file(mut self, path: impl Into<PathBuf>) -> Self {
         self.sources.push(Source::File(path.into()));
         self
@@ -57,7 +57,7 @@ impl<C: Config> Builder<C> {
         let mut partial = C::Partial::empty();
         for source in self.sources {
             let layer = match source {
-                #[cfg(any(feature = "toml", feature = "yaml"))]
+                #[cfg(any(feature = "toml", feature = "yaml", feature = "json5"))]
                 Source::File(path) => File::new(path)?.load()?,
                 Source::Env => C::Partial::from_env()?,
                 Source::Preloaded(p) => p,
@@ -71,7 +71,7 @@ impl<C: Config> Builder<C> {
 }
 
 enum Source<C: Config> {
-    #[cfg(any(feature = "toml", feature = "yaml"))]
+    #[cfg(any(feature = "toml", feature = "yaml", feature = "json5"))]
     File(PathBuf),
     Env,
     Preloaded(C::Partial),

@@ -53,7 +53,7 @@ impl File {
         // warnings. This should not happen as `self`, a type containing an empty
         // enum, is in scope, meaning that the code cannot be reached.
         #![cfg_attr(
-            not(any(feature = "toml", feature = "yaml")),
+            not(any(feature = "toml", feature = "yaml", feature = "json5")),
             allow(unused_variables),
         )]
 
@@ -90,6 +90,12 @@ impl File {
             #[cfg(feature = "yaml")]
             FileFormat::Yaml => serde_yaml::from_slice(&file_content)
                 .map_err(|e| error(Box::new(e))),
+
+            #[cfg(feature = "json5")]
+            FileFormat::Json5 => {
+                let s = std::str::from_utf8(&file_content).map_err(|e| error(Box::new(e)))?;
+                json5::from_str(s).map_err(|e| error(Box::new(e)))
+            },
         }
     }
 }
@@ -100,6 +106,7 @@ impl File {
 pub enum FileFormat {
     #[cfg(feature = "toml")] Toml,
     #[cfg(feature = "yaml")] Yaml,
+    #[cfg(feature = "json5")] Json5,
 }
 
 impl FileFormat {
@@ -112,6 +119,9 @@ impl FileFormat {
 
             #[cfg(feature = "yaml")]
             "yaml" | "yml" => Some(Self::Yaml),
+
+            #[cfg(feature = "json5")]
+            "json5" | "json" => Some(Self::Json5),
 
             _ => None,
         }

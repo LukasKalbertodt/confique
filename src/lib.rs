@@ -160,8 +160,9 @@
 //!
 //! - `toml`: enables TOML support and adds the `toml` dependency.
 //! - `yaml`: enables YAML support and adds the `serde_yaml` dependency.
+//! - `json5`: enables YAML support and adds the `json5` dependency.
 
-#[cfg(any(feature = "toml", feature = "yaml"))]
+#[cfg(any(feature = "toml", feature = "yaml", feature = "json5"))]
 use std::path::PathBuf;
 
 use serde::Deserialize;
@@ -174,11 +175,14 @@ mod env;
 mod error;
 pub mod meta;
 
-#[cfg(any(feature = "toml", feature = "yaml"))]
+#[cfg(any(feature = "toml", feature = "yaml", feature = "json5"))]
 mod format;
 
-#[cfg(any(feature = "toml", feature = "yaml"))]
+#[cfg(any(feature = "toml", feature = "yaml", feature = "json5"))]
 mod file;
+
+#[cfg(feature = "json5")]
+pub mod json5;
 
 #[cfg(feature = "toml")]
 pub mod toml;
@@ -196,7 +200,7 @@ pub use self::{
     error::Error,
 };
 
-#[cfg(any(feature = "toml", feature = "yaml"))]
+#[cfg(any(feature = "toml", feature = "yaml", feature = "json5"))]
 pub use crate::file::{File, FileFormat};
 
 
@@ -422,7 +426,7 @@ pub trait Config: Sized {
     ///
     /// let conf = Conf::from_file("config.toml");
     /// ```
-    #[cfg(any(feature = "toml", feature = "yaml"))]
+    #[cfg(any(feature = "toml", feature = "yaml", feature = "json5"))]
     fn from_file(path: impl Into<PathBuf>) -> Result<Self, Error> {
         let default_values = Self::Partial::default_values();
         let mut file = File::new(path)?;

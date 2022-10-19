@@ -1,0 +1,27 @@
+// A sample configuration for our app.
+{
+  http: {
+    headers: {
+      // The header in which the reverse proxy specifies the username.
+      //
+      // Default value: "x-username"
+      //username: "x-username",
+
+      // The header in which the reverse proxy specifies the display name.
+      //
+      // Default value: "x-display-name"
+      //display_name: "x-display-name",
+    },
+
+    log: {
+      // If set to `true`, the app will log to stdout.
+      //
+      // Default value: true
+      //stdout: true,
+
+      // If this is set, the app will write logs to the given file. Of course,
+      // the app has to have write access to that file.
+      //file: ,
+    },
+  },
+}
