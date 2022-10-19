@@ -255,7 +255,6 @@ mod tests {
     fn no_comments() {
         let out = format::<test_utils::example1::Conf>(FormatOptions {
             comments: false,
-            indent: 0,
             .. FormatOptions::default()
         });
         assert_str_eq!(&out, include_format_output!("1-no-comments.toml"));
