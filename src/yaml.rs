@@ -201,19 +201,8 @@ struct PrintExpr(&'static Expr);
 impl fmt::Display for PrintExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self.0 {
-            Expr::Str(v) => {
-                // This is a bit ugly. Sadly, no YAML crate in our dependency
-                // tree has an API to serialize a string only, without emitting
-                // the `---` at the start of the document. But instead of
-                // implementing the quoting logic ourselves (which is really
-                // complicated as it turns out!), we use this hack.
-                let value = serde_yaml::Value::String(v.to_owned());
-                let serialized = serde_yaml::to_string(&value).unwrap();
-                serialized[4..].trim_end_matches('\n').fmt(f)
-            },
-            Expr::Float(v) => v.fmt(f),
-            Expr::Integer(v) => v.fmt(f),
-            Expr::Bool(v) => v.fmt(f),
+            // We have to special case arrays as the normal formatter only emits
+            // multi line lists.
             Expr::Array(items) => {
                 // TODO: pretty printing of long arrays onto multiple lines?
                 f.write_char('[')?;
@@ -225,6 +214,19 @@ impl fmt::Display for PrintExpr {
                 }
                 f.write_char(']')?;
                 Ok(())
+            }
+
+            // All these other types can simply be serialized as is.
+            Expr::Str(_) | Expr::Float(_) | Expr::Integer(_) | Expr::Bool(_) => {
+                let out = serde_yaml::to_string(&self.0).expect("string serialization to YAML failed");
+
+                // Unfortunately, `serde_yaml` cannot serialize these values on its own
+                // without embedding them in a full document (starting with `---` and
+                // ending with a newline). So we need to cleanup.
+                out.strip_prefix("---\n")
+                    .unwrap_or(&out)
+                    .trim_matches('\n')
+                    .fmt(f)
             }
         }
     }

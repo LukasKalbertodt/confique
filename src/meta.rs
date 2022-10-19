@@ -47,7 +47,8 @@ pub enum LeafKind {
     Optional,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize)]
+#[serde(untagged)]
 pub enum Expr {
     Str(&'static str),
     Float(Float),
@@ -56,13 +57,15 @@ pub enum Expr {
     Array(&'static [Expr]),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize)]
+#[serde(untagged)]
 pub enum Float {
     F32(f32),
     F64(f64),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(untagged)]
 pub enum Integer {
     U8(u8),
     U16(u16),

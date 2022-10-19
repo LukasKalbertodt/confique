@@ -216,26 +216,17 @@ fn format_impl(
 /// Helper to emit `meta::Expr` into TOML.
 struct PrintExpr(&'static Expr);
 
+impl From<&'static Expr> for PrintExpr {
+    fn from(expr: &'static Expr) -> Self {
+        Self(expr)
+    }
+}
+
 impl fmt::Display for PrintExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self.0 {
-            Expr::Str(v) => toml::Value::String(v.to_owned()).fmt(f),
-            Expr::Float(v) => v.fmt(f),
-            Expr::Integer(v) => v.fmt(f),
-            Expr::Bool(v) => v.fmt(f),
-            Expr::Array(items) => {
-                // TODO: pretty printing of long arrays onto multiple lines?
-                f.write_char('[')?;
-                for (i, item) in items.iter().enumerate() {
-                    if i != 0 {
-                        f.write_str(", ")?;
-                    }
-                    PrintExpr(item).fmt(f)?;
-                }
-                f.write_char(']')?;
-                Ok(())
-            },
-        }
+        toml::to_string(&self.0)
+            .expect("string serialization to TOML failed")
+            .fmt(f)
     }
 }
 
