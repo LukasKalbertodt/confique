@@ -1,10 +1,13 @@
 #site_name:
+
 http:
   #port:
+  #bind: 127.0.0.1
+
   headers:
     #username: x-username
     #display_name: x-display-name
-  #bind: 127.0.0.1
+
 log:
   #stdout: true
   #file:

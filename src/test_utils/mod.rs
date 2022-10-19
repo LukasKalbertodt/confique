@@ -1,4 +1,5 @@
 pub(crate) mod example1;
+pub(crate) mod example2;
 
 
 #[allow(unused_macros)]

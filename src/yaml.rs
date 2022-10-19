@@ -5,45 +5,26 @@ use std::fmt::{self, Write};
 
 use crate::{
     Config,
-    format::{DefaultValueComment, add_empty_line, assert_single_trailing_newline},
-    meta::{Expr, FieldKind, LeafKind, Meta},
+    format::{self, Formatter},
+    meta::Expr,
 };
 
 
 
 /// Options for generating a YAML template.
 pub struct FormatOptions {
-    // TODO: think about forward/backwards compatibility.
-
     /// Amount of indentation in spaces. Default: 2.
     pub indent: u8,
 
-    /// Whether to include doc comments (with your own text and information
-    /// about whether a value is required and/or has a default). Default:
-    /// true.
-    pub comments: bool,
-
-    /// If `comments` and this field are `true`, leaf fields with `env = "FOO"`
-    /// attribute will have a line like this added:
-    ///
-    /// ```text
-    /// # Can also be specified via environment variable `FOO`.
-    /// ```
-    ///
-    /// Default: `true`.
-    pub env_keys: bool,
-
-    // Potential future options:
-    // - Comment out default values (`#foo = 3` vs `foo = 3`)
-    // - Which docs to include from nested objects
+    /// Non-TOML specific options.
+    general: format::Options,
 }
 
 impl Default for FormatOptions {
     fn default() -> Self {
         Self {
             indent: 2,
-            comments: true,
-            env_keys: true,
+            general: Default::default(),
         }
     }
 }
@@ -112,91 +93,80 @@ impl Default for FormatOptions {
 /// }
 /// ```
 pub fn format<C: Config>(options: FormatOptions) -> String {
-    let mut out = String::new();
-    let meta = &C::META;
-
-    // Print root docs.
-    if options.comments {
-        meta.doc.iter().for_each(|doc| writeln!(out, "#{doc}").unwrap());
-        if !meta.doc.is_empty() {
-            add_empty_line(&mut out);
-        }
-    }
-
-    // Recursively format all nested objects and fields
-    format_impl(&mut out, meta, 0, &options);
-    assert_single_trailing_newline(&mut out);
-
-    out
+    let mut out = YamlFormatter::new(&options);
+    format::format::<C>(&mut out, options.general);
+    out.finish()
 }
 
-fn format_impl(
-    s: &mut String,
-    meta: &Meta,
-    depth: usize,
-    options: &FormatOptions,
-) {
-    /// Like `println!` but into `s` and with indentation.
-    macro_rules! emit {
-        ($fmt:literal $(, $args:expr)* $(,)?) => {{
-            // Writing to a string never fails, we can unwrap.
-            let indent = depth * options.indent as usize;
-            write!(s, "{: <1$}", "", indent).unwrap();
-            writeln!(s, $fmt $(, $args)*).unwrap();
-        }};
+struct YamlFormatter {
+    indent: u8,
+    buffer: String,
+    depth: u8,
+}
+
+impl YamlFormatter {
+    fn new(options: &FormatOptions) -> Self {
+        Self {
+            indent: options.indent,
+            buffer: String::new(),
+            depth: 0,
+        }
     }
 
-    for field in meta.fields {
-        let mut emitted_something = false;
-        macro_rules! empty_sep_doc_line {
-            () => {
-                if emitted_something {
-                    emit!("#");
-                }
-            };
-        }
+    fn emit_indentation(&mut self) {
+        let num_spaces = self.depth as usize * self.indent as usize;
+        write!(self.buffer, "{: <1$}", "", num_spaces).unwrap();
+    }
+}
 
-        if options.comments {
-            field.doc.iter().for_each(|doc| emit!("#{doc}"));
-            emitted_something = !field.doc.is_empty();
+impl format::Formatter for YamlFormatter {
+    type ExprPrinter = PrintExpr;
 
-            if let FieldKind::Leaf { env: Some(env), .. } = field.kind {
-                empty_sep_doc_line!();
-                emit!("# Can also be specified via environment variable `{env}`.")
-            }
-        }
+    fn buffer(&mut self) -> &mut String {
+        &mut self.buffer
+    }
 
-        match &field.kind {
-            FieldKind::Leaf { kind: LeafKind::Required { default }, .. } => {
-                // Emit comment about default value or the value being required
-                if options.comments {
-                    empty_sep_doc_line!();
-                    emit!("# {}", DefaultValueComment(default.as_ref().map(PrintExpr)));
-                }
+    fn comment(&mut self, comment: impl fmt::Display) {
+        self.emit_indentation();
+        writeln!(self.buffer, "#{comment}").unwrap();
+    }
 
-                // Emit the actual line with the name and optional value
-                match default {
-                    Some(v) => emit!("#{}: {}", field.name, PrintExpr(v)),
-                    None => emit!("#{}:", field.name),
-                }
-            }
+    fn disabled_field(&mut self, name: &str, value: Option<&'static Expr>) {
+        match value.map(PrintExpr) {
+            None => self.comment(format_args!("{name}:")),
+            Some(v) => self.comment(format_args!("{name}: {v}")),
+        };
+    }
 
-            FieldKind::Leaf { kind: LeafKind::Optional, .. } => emit!("#{}:", field.name),
+    fn start_nested(&mut self, name: &'static str, doc: &[&'static str]) {
+        doc.iter().for_each(|doc| self.comment(doc));
+        self.emit_indentation();
+        writeln!(self.buffer, "{name}:").unwrap();
+        self.depth += 1;
+    }
 
-            FieldKind::Nested { meta } => {
-                emit!("{}:", field.name);
-                format_impl(s, meta, depth + 1, options);
-            }
-        }
+    fn end_nested(&mut self) {
+        self.depth = self.depth.checked_sub(1).expect("formatter bug: ended too many nested");
+    }
 
-        if options.comments {
-            add_empty_line(s);
-        }
+    fn start_main(&mut self) {
+        self.make_gap(1);
+    }
+
+    fn finish(self) -> String {
+        assert_eq!(self.depth, 0, "formatter bug: lingering nested objects");
+        self.buffer
     }
 }
 
 /// Helper to emit `meta::Expr` into YAML.
 struct PrintExpr(&'static Expr);
+
+impl From<&'static Expr> for PrintExpr {
+    fn from(expr: &'static Expr) -> Self {
+        Self(expr)
+    }
+}
 
 impl fmt::Display for PrintExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -247,10 +217,15 @@ mod tests {
 
     #[test]
     fn no_comments() {
-        let out = format::<test_utils::example1::Conf>(FormatOptions {
-            comments: false,
-            .. FormatOptions::default()
-        });
+        let mut options = FormatOptions::default();
+        options.general.comments = false;
+        let out = format::<test_utils::example1::Conf>(options);
         assert_str_eq!(&out, include_format_output!("1-no-comments.yaml"));
+    }
+
+    #[test]
+    fn immediately_nested() {
+        let out = format::<test_utils::example2::Conf>(Default::default());
+        assert_str_eq!(&out, include_format_output!("2-default.yaml"));
     }
 }

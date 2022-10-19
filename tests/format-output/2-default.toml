@@ -1,25 +1,6 @@
 # A sample configuration for our app.
 
-# Name of the website.
-#
-# Required! This value must be specified.
-#site_name =
-
-# Configurations related to the HTTP communication.
 [http]
-# The port the server will listen on.
-#
-# Can also be specified via environment variable `PORT`.
-#
-# Required! This value must be specified.
-#port =
-
-# The bind address of the server. Can be set to `0.0.0.0` for example, to
-# allow other users of the network to access the server.
-#
-# Default value: "127.0.0.1"
-#bind = "127.0.0.1"
-
 [http.headers]
 # The header in which the reverse proxy specifies the username.
 #
@@ -31,8 +12,7 @@
 # Default value: "x-display-name"
 #display_name = "x-display-name"
 
-# Configuring the logging.
-[log]
+[http.log]
 # If set to `true`, the app will log to stdout.
 #
 # Default value: true
