@@ -209,7 +209,7 @@ impl fmt::Display for PrintExpr {
                 // complicated as it turns out!), we use this hack.
                 let value = serde_yaml::Value::String(v.to_owned());
                 let serialized = serde_yaml::to_string(&value).unwrap();
-                serialized[4..].fmt(f)
+                serialized[4..].trim_end_matches('\n').fmt(f)
             },
             Expr::Float(v) => v.fmt(f),
             Expr::Integer(v) => v.fmt(f),
