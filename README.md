@@ -13,26 +13,28 @@ Confique is a rather light-weight library that helps with configuration manageme
 - **Layered configuration**: you can load from and then merge multiple sources of configuration.
 - **Load config values from**:
     - Environment variables
-    - Files: TOML & YAML
-    - Anything with a `serde` Deserializer (built-in support for more formats coming soon)
+    - Files: [TOML](https://toml.io/), [YAML](https://yaml.org/), and [JSON5](https://json5.org/)
+    - Anything with a `serde` Deserializer
 - **Based on `serde`**: less code in `confique` (more light-weight) and access to a huge ecosystem of high quality parsers.
-- Easily generate configuration "templates" to describe all available config values to your users.
+- **Easily generate configuration "templates"**: describe all available config values to your users without repeating yourself.
 
 
 ## Simple example
 
 ```rust
-use std::path::PathBuf;
+use std::{net::IpAddr, path::PathBuf};
 use confique::Config;
 
 
 #[derive(Config)]
 struct Conf {
-    #[config(env = "EXAMPLE_APP_USERNAME")]
-    username: String,
+    /// Port to listen on.
+    #[config(env = "PORT", default = 8080)]
+    port: u16,
 
-    #[config(env = "EXAMPLE_APP_BUFFER_SIZE", default = 4096)]
-    buffer_size: u32,
+    /// Bind address.
+    #[config(default = "127.0.0.1")]
+    address: IpAddr,
 
     #[config(nested)]
     log: LogConf,
@@ -44,6 +46,9 @@ struct LogConf {
     stdout: bool,
 
     file: Option<PathBuf>,
+
+    #[config(default = ["debug"])]
+    ignored_modules: Vec<String>,
 }
 
 
@@ -56,10 +61,90 @@ let config = Conf::builder()
 
 See [**the documentation**](https://docs.rs/confique) for more information.
 
+### Configuration Template
+
+With the above example, you can automatically generate a configuration template:
+a file in a chosen format that lists all values with their description, default values, and env values.
+
+<table>
+<tr>
+    <td><code>toml::template::&lt;Conf&gt;()</code></td>
+    <td><code>yaml::template::&lt;Conf&gt;()</code></td>
+    <td><code>json5::template::&lt;Conf&gt;()</code></td>
+</tr>
+<tr>
+<td>
+
+```toml
+# Port to listen on.
+#
+# Can also be specified via
+# environment variable `PORT`.
+#
+# Default value: 8080
+#port = 8080
+
+# Bind address.
+#
+# Default value: "127.0.0.1"
+#address = "127.0.0.1"
+
+[log]
+# <omitted>
+```
+
+</td>
+<td>
+
+```yaml
+# Port to listen on.
+#
+# Can also be specified via
+# environment variable `PORT`.
+#
+# Default value: 8080
+#port: 8080
+
+# Bind address.
+#
+# Default value: 127.0.0.1
+#address: 127.0.0.1
+
+log:
+  # <omitted>
+```
+
+</td>
+<td>
+
+```json5
+{
+  // Port to listen on.
+  //
+  // Can also be specified via
+  // environment variable `PORT`.
+  //
+  // Default value: 8080
+  //port: 8080,
+
+  // Bind address.
+  //
+  // Default value: "127.0.0.1"
+  //address: "127.0.0.1",
+
+  log: {
+    // <omitted>
+  },
+}
+```
+
+</td>
+</tr>
+</table>
+
+<sup>(Note: The "environment variable" sentence is on a single line; I just split it into two lines for readability in this README.)</sup>
 
 ## Comparison with other libraries/solutions
-
-Obviously, all other libraries are more mature than confique.
 
 ### [`config`](https://crates.io/crates/config)
 
@@ -86,9 +171,9 @@ With `confique` you also get some other handy helpers.
 
 ## Status of this project
 
-Confique is still a very young project.
-There are lots of features and improvements already planned.
-I'm developing this library alongside a web project that uses it.
+There is still some design space to explore and there are certainly still many features one could add.
+However, the core interface (the derive macro and the core traits) probably won't change a lot anymore.
+Confique is used by a web project (that's already used in production) which I'm developing alongside of confique.
 
 
 <br />
