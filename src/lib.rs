@@ -156,7 +156,14 @@
 //! # Cargo features
 //!
 //! This crate has a Cargo feature for each supported file format which are all
-//! enabled by default.
+//! enabled by default to get started easily. If you don't need certain
+//! features, remember to disable them to save compile time:
+//!
+//! ```toml
+//! confique = { version = "...", default-features = false, features = ["toml"] }
+//! ```
+//!
+//! All crate features:
 //!
 //! - `toml`: enables TOML support and adds the `toml` dependency.
 //! - `yaml`: enables YAML support and adds the `serde_yaml` dependency.
@@ -207,7 +214,10 @@ pub use crate::{
 /// Derives (automatically implements) [`Config`] for a struct.
 ///
 /// This only works for structs with named fields, but not for tuple structs,
-/// unit structs, enums, or unions.
+/// unit structs, enums, or unions. This macro only works sometimes inside of
+/// functions (as it generates a module and symbol resolution is weird in that
+/// case); if you get weird errors "symbol not found", just move the struct
+/// definition outside of the function.
 ///
 /// # Quick example
 ///
@@ -230,6 +240,9 @@ pub use crate::{
 ///
 ///     #[config(default = "127.0.0.1")]
 ///     bind: IpAddr,
+///
+///     #[config(default = ["x-user", "x-password"])]
+///     headers: Vec<String>,
 /// }
 /// # fn main() {}
 /// ```
@@ -256,7 +269,8 @@ pub use crate::{
 ///
 /// - **Leaf fields**: all fields *not* annotated with `#[config(nested)]`,
 ///   these contain your actual values. The type of such a field has to
-///   implement `serde::Deserialize`.
+///   implement `serde::Deserialize` or you have to add a `deserialize_with`
+///   attribute.
 ///
 /// Doc comments on the struct and the individual fields are interpreted and
 /// stored in [`Meta`][meta::Meta]. They are used in the formatting functions
@@ -270,12 +284,33 @@ pub use crate::{
 /// - **`#[config(default = ...)]`**: sets a default value for this field. This
 ///   is returned by [`Partial::default_values`] and, in most circumstances,
 ///   used as a last "layer" to pull values from that have not been set in a
-///   layer of higher-priority. Currently, Boolean, float, integer and string
-///   values are allowed.
+///   layer of higher-priority. Currently, Boolean, float, integer, string, and
+///   array values are allowed. The same set of types is allowed as type for
+///   array items.
+///
+///   The field value is deserialized from the specified default value
+///   (via `serde::de::IntoDeserializer`). So the expression after `default =`
+///   is often not the same Rust type as your field. For example, you can have
+///   `#[config(default = "/foo/bar")]` on the field `path: PathBuf`. This
+///   works fine as `PathBuf` can be deserialized from a string. (Also see the
+///   `IpAddr` field in the example above.)
+///
+///   If you use an integer or float literal without type suffix, `confique` has
+///   to infer the exact type from the type of the field. This should work in
+///   most cases (`u8`, `f32`, `Vec<i16>`, `[f64; 3]`, ...), but this type
+///   inference is very basic, not even close to what Rust can do. If confique
+///   cannot figure out the type, it defaults to `i32` for integers and `f64`
+///   for floats (like Rust does). If that causes problems for you, just add a
+///   type suffix, e.g. `default = 800u32`.
 ///
 /// - **`#[config(env = "KEY")]`**: assigns an environment variable to this
 ///   field. In [`Partial::from_env`], the variable is checked and
 ///   deserialized into the field if present.
+///
+/// - **`#[config(deserialize_with = path::to::function)]`**: like
+///   [serde's `deserialize_with` attribute][serde-deser].
+///
+/// [serde-deser]: https://serde.rs/field-attrs.html#deserialize_with
 ///
 ///
 /// ## Special types for leaf fields
@@ -302,6 +337,7 @@ pub use crate::{
 /// like this:
 ///
 /// ```ignore
+/// // ----- Generated for `Conf` -----
 /// impl confique::Config for Conf {
 ///     type Partial = confique_partial_conf::PartialConf;
 ///     ...
@@ -318,6 +354,7 @@ pub use crate::{
 ///     impl confique::Partial for PartialConf { ... }
 /// }
 ///
+/// // ----- Generated for `HttpConf` -----
 /// impl confique::Config for HttpConf {
 ///     type Partial = confique_partial_http_conf::PartialHttpConf;
 ///     ...
@@ -327,6 +364,7 @@ pub use crate::{
 ///     pub(super) struct PartialHttpConf {
 ///         pub(super) port: Option<u16>,
 ///         pub(super) bind: Option<IpAddr>,
+///         pub(super) headers: Option<Vec<String>>,
 ///     }
 ///
 ///     impl confique::Partial for PartialHttpConf { ... }
