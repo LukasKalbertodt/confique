@@ -92,4 +92,3 @@ fn inferred_type() {
     assert_eq!(def.parens, vec![1.0, 2.0]);
     assert_eq!(def.fallback, std::time::Duration::new(13, 27));
 }
-

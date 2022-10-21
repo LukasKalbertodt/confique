@@ -284,9 +284,19 @@ pub use crate::{
 /// - **`#[config(default = ...)]`**: sets a default value for this field. This
 ///   is returned by [`Partial::default_values`] and, in most circumstances,
 ///   used as a last "layer" to pull values from that have not been set in a
-///   layer of higher-priority. Currently, Boolean, float, integer, string, and
-///   array values are allowed. The same set of types is allowed as type for
-///   array items.
+///   layer of higher-priority. Currently, the following expressions are
+///   allowed:
+///
+///   - Booleans, e.g. `default = true`
+///   - Integers, e.g. `default = 900`
+///   - Floats, e.g. `default = 3.14`
+///   - Strings, e.g. `default = "fox"`
+///   - Arrays, e.g. `default = ["foo", "bar"]`
+///   - Key value maps, e.g. `default = { "cat": 3.14, "bear": 9.0 }`
+///
+///   Map keys can be Booleans, integers, floats, and strings. For array and map
+///   values, you can use any of the expressions in the list above (i.e. you
+///   can nest arrays/maps).
 ///
 ///   The field value is deserialized from the specified default value
 ///   (via `serde::de::IntoDeserializer`). So the expression after `default =`

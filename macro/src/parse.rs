@@ -1,7 +1,7 @@
 use syn::{Error, Token, parse::{Parse, ParseStream}, spanned::Spanned, punctuated::Punctuated};
 
 use crate::{
-    ir::{Input, Field, FieldKind, LeafKind, Expr},
+    ir::{Input, Field, FieldKind, LeafKind, Expr, MapEntry, MapKey},
     util::{unwrap_option, is_option},
 };
 
@@ -112,21 +112,54 @@ impl Parse for Expr {
             (string, integer, float, bool), and arrays";
 
         if input.peek(syn::token::Bracket) {
+            // ----- Array -----
             let content;
             syn::bracketed!(content in input);
 
             let items = <Punctuated<Expr, Token![,]>>::parse_terminated(&content)?;
             Ok(Self::Array(items.into_iter().collect()))
+        } else if input.peek(syn::token::Brace) {
+            // ----- Map -----
+            let content;
+            syn::braced!(content in input);
+
+            let items = <Punctuated<MapEntry, Token![,]>>::parse_terminated(&content)?;
+            Ok(Self::Map(items.into_iter().collect()))
         } else {
-            let lit: syn::Lit = input.parse()
-                .map_err(|_| Error::new(input.span(), msg))?;
-            match lit {
-                syn::Lit::Str(l) => Ok(Self::Str(l)),
-                syn::Lit::Int(l) => Ok(Self::Int(l)),
-                syn::Lit::Float(l) => Ok(Self::Float(l)),
-                syn::Lit::Bool(l) => Ok(Self::Bool(l)),
-                _ => Err(Error::new(lit.span(), msg)),
-            }
+            // ----- Literal -----
+
+            // We just use `MapKey` here as it's exactly what we want, despite
+            // this not having anything to do with maps.
+            input.parse::<MapKey>()
+                .map_err(|_| Error::new(input.span(), msg))
+                .map(Into::into)
+        }
+    }
+}
+
+
+
+impl Parse for MapEntry {
+    fn parse(input: ParseStream) -> Result<Self, syn::Error> {
+        let key: MapKey = input.parse()?;
+        let _: syn::Token![:] = input.parse()?;
+        let value: Expr = input.parse()?;
+        Ok(Self { key, value })
+    }
+}
+
+impl Parse for MapKey {
+    fn parse(input: ParseStream) -> Result<Self, syn::Error> {
+        let lit: syn::Lit = input.parse()?;
+        match lit {
+            syn::Lit::Str(l) => Ok(Self::Str(l)),
+            syn::Lit::Int(l) => Ok(Self::Int(l)),
+            syn::Lit::Float(l) => Ok(Self::Float(l)),
+            syn::Lit::Bool(l) => Ok(Self::Bool(l)),
+            _ => Err(Error::new(
+                lit.span(),
+                "only string, integer, float, and Boolean literals allowed as map key",
+            )),
         }
     }
 }
@@ -295,5 +328,16 @@ fn assert_empty_or_comma(input: ParseStream) -> Result<(), Error> {
         Ok(())
     } else {
         Err(Error::new(input.span(), "unexpected tokens, expected no more tokens in this context"))
+    }
+}
+
+impl From<MapKey> for Expr {
+    fn from(src: MapKey) -> Self {
+        match src {
+            MapKey::Str(v) => Self::Str(v),
+            MapKey::Int(v) => Self::Int(v),
+            MapKey::Float(v) => Self::Float(v),
+            MapKey::Bool(v) => Self::Bool(v),
+        }
     }
 }

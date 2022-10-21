@@ -1,4 +1,4 @@
-use std::{path::PathBuf, net::IpAddr};
+use std::{path::PathBuf, net::IpAddr, collections::HashMap};
 
 use pretty_assertions::assert_eq;
 use confique::{Config, meta, Partial};
@@ -278,4 +278,19 @@ pub(crate) fn deserialize_dummy<'de, D>(deserializer: D) -> Result<Dummy, D::Err
 
     let s = String::deserialize(deserializer)?;
     Ok(Dummy(format!("dummy {s}")))
+}
+
+// This only makes sure this compiles and doesn't result in any "cannot infer
+// type" problems.
+#[test]
+fn empty_array_and_map() {
+    #[derive(Config)]
+    #[allow(dead_code)]
+    struct Animals {
+        #[config(default = [])]
+        cat: Vec<String>,
+
+        #[config(default = {})]
+        dog: HashMap<u32, f32>,
+    }
 }

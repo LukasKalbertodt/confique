@@ -56,6 +56,26 @@ pub enum Expr {
     Integer(Integer),
     Bool(bool),
     Array(&'static [Expr]),
+
+    /// A key value map, stored as slice in source code order.
+    #[serde(serialize_with = "serialize_map")]
+    Map(&'static [MapEntry])
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize)]
+#[serde(untagged)]
+#[non_exhaustive]
+pub enum MapKey {
+    Str(&'static str),
+    Float(Float),
+    Integer(Integer),
+    Bool(bool),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MapEntry {
+    pub key: MapKey,
+    pub value: Expr,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize)]
@@ -109,4 +129,28 @@ impl fmt::Display for Integer {
             Self::Isize(i) => i.fmt(f),
         }
     }
+}
+
+impl From<MapKey> for Expr {
+    fn from(src: MapKey) -> Self {
+        match src {
+            MapKey::Str(v) => Self::Str(v),
+            MapKey::Integer(v) => Self::Integer(v),
+            MapKey::Float(v) => Self::Float(v),
+            MapKey::Bool(v) => Self::Bool(v),
+        }
+    }
+}
+
+fn serialize_map<S>(map: &&'static [MapEntry], serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    use serde::ser::SerializeMap;
+
+    let mut s = serializer.serialize_map(Some(map.len()))?;
+    for entry in *map {
+        s.serialize_entry(&entry.key, &entry.value)?;
+    }
+    s.end()
 }

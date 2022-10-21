@@ -82,3 +82,21 @@ where
         serde::de::value::SeqDeserializer::new(self.0.into_iter())
     }
 }
+
+/// `serde` does implement `IntoDeserializer` for `HashMap` and `BTreeMap` but
+/// we want to keep the exact source code order of entries, so we need our own
+/// type.
+pub struct MapIntoDeserializer<K, V>(pub Vec<(K, V)>);
+
+impl<'de, K, V, E> serde::de::IntoDeserializer<'de, E> for MapIntoDeserializer<K, V>
+where
+    K: serde::de::IntoDeserializer<'de, E>,
+    V: serde::de::IntoDeserializer<'de, E>,
+    E: serde::de::Error,
+{
+    type Deserializer = serde::de::value::MapDeserializer<'de, std::vec::IntoIter<(K, V)>, E>;
+
+    fn into_deserializer(self) -> Self::Deserializer {
+        serde::de::value::MapDeserializer::new(self.0.into_iter())
+    }
+}

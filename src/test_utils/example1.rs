@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::{
     net::IpAddr,
     path::PathBuf,
@@ -50,6 +51,10 @@ pub struct Headers {
     /// Headers that are allowed.
     #[config(default = ["content-type", "content-encoding"])]
     pub allowed: Vec<String>,
+
+    /// Assigns a score to some headers.
+    #[config(default = { "cookie": 1.5, "server": 12.7 })]
+    pub score: HashMap<String, f32>,
 }
 
 

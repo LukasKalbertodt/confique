@@ -38,6 +38,11 @@
 # Default value: ["content-type", "content-encoding"]
 #allowed = ["content-type", "content-encoding"]
 
+# Assigns a score to some headers.
+#
+# Default value: { cookie = 1.5, server = 12.7 }
+#score = { cookie = 1.5, server = 12.7 }
+
 
 # Configuring the logging.
 [log]

@@ -67,4 +67,18 @@ pub(crate) enum Expr {
     Float(syn::LitFloat),
     Bool(syn::LitBool),
     Array(Vec<Expr>),
+    Map(Vec<MapEntry>),
+}
+
+pub(crate) struct MapEntry {
+    pub(crate) key: MapKey,
+    pub(crate) value: Expr,
+}
+
+#[derive(Clone)]
+pub(crate) enum MapKey {
+    Str(syn::LitStr),
+    Int(syn::LitInt),
+    Float(syn::LitFloat),
+    Bool(syn::LitBool),
 }

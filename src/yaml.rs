@@ -121,7 +121,7 @@ impl YamlFormatter {
 }
 
 impl Formatter for YamlFormatter {
-    type ExprPrinter = PrintExpr;
+    type ExprPrinter = PrintExpr<'static>;
 
     fn buffer(&mut self) -> &mut String {
         &mut self.buffer
@@ -161,15 +161,15 @@ impl Formatter for YamlFormatter {
 }
 
 /// Helper to emit `meta::Expr` into YAML.
-struct PrintExpr(&'static Expr);
+struct PrintExpr<'a>(&'a Expr);
 
-impl From<&'static Expr> for PrintExpr {
+impl From<&'static Expr> for PrintExpr<'static> {
     fn from(expr: &'static Expr) -> Self {
         Self(expr)
     }
 }
 
-impl fmt::Display for PrintExpr {
+impl fmt::Display for PrintExpr<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self.0 {
             // We have to special case arrays as the normal formatter only emits
@@ -186,6 +186,21 @@ impl fmt::Display for PrintExpr {
                 f.write_char(']')?;
                 Ok(())
             }
+
+            Expr::Map(entries) => {
+                // TODO: pretty printing of long arrays onto multiple lines?
+                f.write_str("{ ")?;
+                for (i, entry) in entries.iter().enumerate() {
+                    if i != 0 {
+                        f.write_str(", ")?;
+                    }
+                    PrintExpr(&entry.key.clone().into()).fmt(f)?;
+                    f.write_str(": ")?;
+                    PrintExpr(&entry.value).fmt(f)?;
+                }
+                f.write_str(" }")?;
+                Ok(())
+            },
 
             // All these other types can simply be serialized as is.
             Expr::Str(_) | Expr::Float(_) | Expr::Integer(_) | Expr::Bool(_) => {

@@ -6,7 +6,7 @@ use std::fmt::{self, Write};
 use crate::{
     Config,
     template::{self, Formatter},
-    meta::Expr,
+    meta::{Expr, MapKey},
 };
 
 
@@ -119,7 +119,7 @@ impl TomlFormatter {
 }
 
 impl Formatter for TomlFormatter {
-    type ExprPrinter = PrintExpr;
+    type ExprPrinter = PrintExpr<'static>;
 
     fn buffer(&mut self) -> &mut String {
         &mut self.buffer
@@ -159,20 +159,48 @@ impl Formatter for TomlFormatter {
 }
 
 /// Helper to emit `meta::Expr` into TOML.
-struct PrintExpr(&'static Expr);
+struct PrintExpr<'a>(&'a Expr);
 
-impl From<&'static Expr> for PrintExpr {
+impl From<&'static Expr> for PrintExpr<'static> {
     fn from(expr: &'static Expr) -> Self {
         Self(expr)
     }
 }
 
-impl fmt::Display for PrintExpr {
+impl fmt::Display for PrintExpr<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        toml::to_string(&self.0)
-            .expect("string serialization to TOML failed")
-            .fmt(f)
+        match self.0 {
+            Expr::Map(entries) => {
+                // TODO: pretty printing of long arrays onto multiple lines?
+                f.write_str("{ ")?;
+                for (i, entry) in entries.iter().enumerate() {
+                    if i != 0 {
+                        f.write_str(", ")?;
+                    }
+
+                    match entry.key {
+                        MapKey::Str(s) if is_valid_bare_key(s) => f.write_str(s)?,
+                        _ => PrintExpr(&entry.key.clone().into()).fmt(f)?,
+                    }
+                    f.write_str(" = ")?;
+                    PrintExpr(&entry.value).fmt(f)?;
+                }
+                f.write_str(" }")?;
+                Ok(())
+            },
+
+            // All these other types can simply be serialized as is.
+            Expr::Str(_) | Expr::Float(_) | Expr::Integer(_) | Expr::Bool(_) | Expr::Array(_) => {
+                toml::to_string(&self.0)
+                    .expect("string serialization to TOML failed")
+                    .fmt(f)
+            }
+        }
     }
+}
+
+fn is_valid_bare_key(s: &str) -> bool {
+    s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
 }
 
 #[cfg(test)]

@@ -8,6 +8,7 @@
 #username = "x-username"
 #display_name = "x-display-name"
 #allowed = ["content-type", "content-encoding"]
+#score = { cookie = 1.5, server = 12.7 }
 
 [log]
 #stdout = true
