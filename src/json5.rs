@@ -5,19 +5,19 @@ use std::fmt::{self, Write};
 
 use crate::{
     Config,
-    format::{self, Formatter},
+    template::{self, Formatter},
     meta::Expr,
 };
 
 
 
-/// Options for generating a TOML template.
+/// Options for generating a JSON5 template.
 pub struct FormatOptions {
     /// Indentation per level. Default: 2.
     pub indent: u8,
 
     /// Non-JSON5 specific options.
-    general: format::Options,
+    general: template::Options,
 }
 
 impl Default for FormatOptions {
@@ -29,7 +29,7 @@ impl Default for FormatOptions {
     }
 }
 
-/// Formats the configuration description as a TOML file.
+/// Formats the configuration description as a JSON5 file.
 ///
 /// This can be used to generate a template file that you can give to the users
 /// of your application. It usually is a convenient to start with a correctly
@@ -88,13 +88,13 @@ impl Default for FormatOptions {
 /// ";
 ///
 /// fn main() {
-///     let json5 = confique::json5::format::<Conf>(FormatOptions::default());
+///     let json5 = confique::json5::template::<Conf>(FormatOptions::default());
 ///     assert_eq!(json5, EXPECTED);
 /// }
 /// ```
-pub fn format<C: Config>(options: FormatOptions) -> String {
+pub fn template<C: Config>(options: FormatOptions) -> String {
     let mut out = Json5Formatter::new(&options);
-    format::format::<C>(&mut out, options.general);
+    template::format::<C>(&mut out, options.general);
     out.finish()
 }
 
@@ -171,7 +171,7 @@ impl Formatter for Json5Formatter {
     }
 }
 
-/// Helper to emit `meta::Expr` into TOML.
+/// Helper to emit `meta::Expr` into JSON5.
 struct PrintExpr(&'static Expr);
 
 impl From<&'static Expr> for PrintExpr {
@@ -191,12 +191,12 @@ impl fmt::Display for PrintExpr {
 #[cfg(test)]
 mod tests {
     use crate::test_utils::{self, include_format_output};
-    use super::{format, FormatOptions};
+    use super::{template, FormatOptions};
     use pretty_assertions::assert_str_eq;
 
     #[test]
     fn default() {
-        let out = format::<test_utils::example1::Conf>(FormatOptions::default());
+        let out = template::<test_utils::example1::Conf>(FormatOptions::default());
         assert_str_eq!(&out, include_format_output!("1-default.json5"));
     }
 
@@ -204,13 +204,13 @@ mod tests {
     fn no_comments() {
         let mut options = FormatOptions::default();
         options.general.comments = false;
-        let out = format::<test_utils::example1::Conf>(options);
+        let out = template::<test_utils::example1::Conf>(options);
         assert_str_eq!(&out, include_format_output!("1-no-comments.json5"));
     }
 
     #[test]
     fn immediately_nested() {
-        let out = format::<test_utils::example2::Conf>(Default::default());
+        let out = template::<test_utils::example2::Conf>(Default::default());
         assert_str_eq!(&out, include_format_output!("2-default.json5"));
     }
 }

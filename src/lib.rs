@@ -176,10 +176,10 @@ mod error;
 pub mod meta;
 
 #[cfg(any(feature = "toml", feature = "yaml", feature = "json5"))]
-mod format;
+mod file;
 
 #[cfg(any(feature = "toml", feature = "yaml", feature = "json5"))]
-mod file;
+mod template;
 
 #[cfg(feature = "json5")]
 pub mod json5;

@@ -5,7 +5,7 @@ use std::fmt::{self, Write};
 
 use crate::{
     Config,
-    format::{self, Formatter},
+    template::{self, Formatter},
     meta::Expr,
 };
 
@@ -17,7 +17,7 @@ pub struct FormatOptions {
     pub indent: u8,
 
     /// Non-TOML specific options.
-    general: format::Options,
+    general: template::Options,
 }
 
 impl Default for FormatOptions {
@@ -88,13 +88,13 @@ impl Default for FormatOptions {
 ///
 ///
 /// fn main() {
-///     let yaml = confique::yaml::format::<Conf>(FormatOptions::default());
+///     let yaml = confique::yaml::template::<Conf>(FormatOptions::default());
 ///     assert_eq!(yaml, EXPECTED);
 /// }
 /// ```
-pub fn format<C: Config>(options: FormatOptions) -> String {
+pub fn template<C: Config>(options: FormatOptions) -> String {
     let mut out = YamlFormatter::new(&options);
-    format::format::<C>(&mut out, options.general);
+    template::format::<C>(&mut out, options.general);
     out.finish()
 }
 
@@ -119,7 +119,7 @@ impl YamlFormatter {
     }
 }
 
-impl format::Formatter for YamlFormatter {
+impl Formatter for YamlFormatter {
     type ExprPrinter = PrintExpr;
 
     fn buffer(&mut self) -> &mut String {
@@ -206,12 +206,12 @@ impl fmt::Display for PrintExpr {
 #[cfg(test)]
 mod tests {
     use crate::test_utils::{self, include_format_output};
-    use super::{format, FormatOptions};
+    use super::{template, FormatOptions};
     use pretty_assertions::assert_str_eq;
 
     #[test]
     fn default() {
-        let out = format::<test_utils::example1::Conf>(FormatOptions::default());
+        let out = template::<test_utils::example1::Conf>(FormatOptions::default());
         assert_str_eq!(&out, include_format_output!("1-default.yaml"));
     }
 
@@ -219,13 +219,13 @@ mod tests {
     fn no_comments() {
         let mut options = FormatOptions::default();
         options.general.comments = false;
-        let out = format::<test_utils::example1::Conf>(options);
+        let out = template::<test_utils::example1::Conf>(options);
         assert_str_eq!(&out, include_format_output!("1-no-comments.yaml"));
     }
 
     #[test]
     fn immediately_nested() {
-        let out = format::<test_utils::example2::Conf>(Default::default());
+        let out = template::<test_utils::example2::Conf>(Default::default());
         assert_str_eq!(&out, include_format_output!("2-default.yaml"));
     }
 }
