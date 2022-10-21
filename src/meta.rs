@@ -49,6 +49,7 @@ pub enum LeafKind {
 
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize)]
 #[serde(untagged)]
+#[non_exhaustive]
 pub enum Expr {
     Str(&'static str),
     Float(Float),
