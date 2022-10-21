@@ -293,7 +293,16 @@ fn default_value_to_deserializable_expr(expr: &ir::Expr) -> TokenStream {
         ir::Expr::Bool(lit) => quote! { #lit },
         ir::Expr::Array(arr) => {
             let items = arr.iter().map(default_value_to_deserializable_expr);
-            quote! { confique::internal::ArrayIntoDeserializer([ #(#items),* ]) }
+
+            // Empty arrays cause "cannot infer type" errors here. However, it
+            // really doesn't matter what type the array has as there are 0
+            // elements anyway. So we just pick `()`.
+            let type_annotation = if arr.is_empty() {
+                quote! { as [(); 0] }
+            } else {
+                quote! {}
+            };
+            quote! { confique::internal::ArrayIntoDeserializer([ #(#items),* ] #type_annotation) }
         },
     }
 }
