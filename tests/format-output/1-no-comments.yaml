@@ -7,6 +7,7 @@ http:
   headers:
     #username: x-username
     #display_name: x-display-name
+    #allowed: [content-type, content-encoding]
 
 log:
   #stdout: true

@@ -31,6 +31,11 @@
     # Default value: "x-display-name"
     #display_name = "x-display-name"
 
+    # Headers that are allowed.
+    #
+    # Default value: ["content-type", "content-encoding"]
+    #allowed = ["content-type", "content-encoding"]
+
   # Configuring the logging.
   [log]
   # If set to `true`, the app will log to stdout.

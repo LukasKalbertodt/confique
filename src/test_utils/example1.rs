@@ -46,6 +46,10 @@ pub struct Headers {
     /// The header in which the reverse proxy specifies the display name.
     #[config(default = "x-display-name")]
     pub display_name: String,
+
+    /// Headers that are allowed.
+    #[config(default = ["content-type", "content-encoding"])]
+    pub allowed: Vec<String>,
 }
 
 
