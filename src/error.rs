@@ -1,6 +1,5 @@
 use std::fmt;
 
-#[cfg(any(feature = "toml", feature = "yaml", feature = "json5"))]
 use std::path::PathBuf;
 
 
@@ -10,6 +9,11 @@ pub struct Error {
     pub(crate) inner: Box<ErrorInner>,
 }
 
+// If all these features are disabled, lots of these errors are unused. But
+// instead of repeating this cfg-attribute a lot in the rest of the file, we
+// just live with these unused variants. It's not like we need to optimize the
+// size of `ErrorInner`.
+#[cfg_attr(not(any(feature = "toml", feature = "yaml", feature = "json5")), allow(dead_code))]
 pub(crate) enum ErrorInner {
     /// Returned by `Config::from_partial` when the partial does not contain
     /// values for all required configuration values. The string is a
@@ -17,14 +21,12 @@ pub(crate) enum ErrorInner {
     MissingValue(String),
 
     /// An IO error occured, e.g. when reading a file.
-    #[cfg(any(feature = "toml", feature = "yaml", feature = "json5"))]
     Io {
         path: Option<PathBuf>,
         err: std::io::Error,
     },
 
     /// Returned by `Source::load` implementations when deserialization fails.
-    #[cfg(any(feature = "toml", feature = "yaml", feature = "json5"))]
     Deserialization {
         /// A human readable description for the error message, describing from
         /// what source it was attempted to deserialize. Completes the sentence
@@ -51,20 +53,17 @@ pub(crate) enum ErrorInner {
     /// Returned by the [`Source`] impls for `Path` and `PathBuf` if the file
     /// extension is not supported by confique or if the corresponding Cargo
     /// feature of confique was not enabled.
-    #[cfg(any(feature = "toml", feature = "yaml", feature = "json5"))]
     UnsupportedFileFormat {
         path: PathBuf,
     },
 
     /// Returned by the [`Source`] impls for `Path` and `PathBuf` if the path
     /// does not contain a file extension.
-    #[cfg(any(feature = "toml", feature = "yaml", feature = "json5"))]
     MissingFileExtension {
         path: PathBuf,
     },
 
     /// A file source was marked as required but the file does not exist.
-    #[cfg(any(feature = "toml", feature = "yaml", feature = "json5"))]
     MissingRequiredFile {
         path: PathBuf,
     }
@@ -73,18 +72,13 @@ pub(crate) enum ErrorInner {
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match &*self.inner {
-            #[cfg(any(feature = "toml", feature = "yaml", feature = "json5"))]
             ErrorInner::Io { err, .. } => Some(err),
-            #[cfg(any(feature = "toml", feature = "yaml", feature = "json5"))]
             ErrorInner::Deserialization { err, .. } => Some(&**err),
             ErrorInner::MissingValue(_) => None,
             ErrorInner::EnvNotUnicode { .. } => None,
             ErrorInner::EnvDeserialization { .. } => None,
-            #[cfg(any(feature = "toml", feature = "yaml", feature = "json5"))]
             ErrorInner::UnsupportedFileFormat { .. } => None,
-            #[cfg(any(feature = "toml", feature = "yaml", feature = "json5"))]
             ErrorInner::MissingFileExtension { .. } => None,
-            #[cfg(any(feature = "toml", feature = "yaml", feature = "json5"))]
             ErrorInner::MissingRequiredFile { .. } => None,
         }
     }
@@ -96,22 +90,18 @@ impl fmt::Display for Error {
             ErrorInner::MissingValue(path) => {
                 std::write!(f, "required configuration value is missing: '{path}'")
             }
-            #[cfg(any(feature = "toml", feature = "yaml", feature = "json5"))]
             ErrorInner::Io { path: Some(path), .. } => {
                 std::write!(f,
                     "IO error occured while reading configuration file '{}'",
                     path.display(),
                 )
             }
-            #[cfg(any(feature = "toml", feature = "yaml", feature = "json5"))]
             ErrorInner::Io { path: None, .. } => {
                 std::write!(f, "IO error occured while loading configuration")
             }
-            #[cfg(any(feature = "toml", feature = "yaml", feature = "json5"))]
             ErrorInner::Deserialization { source: Some(source), .. } => {
                 std::write!(f, "failed to deserialize configuration from {source}")
             }
-            #[cfg(any(feature = "toml", feature = "yaml", feature = "json5"))]
             ErrorInner::Deserialization { source: None, .. } => {
                 std::write!(f, "failed to deserialize configuration")
             }
@@ -123,21 +113,18 @@ impl fmt::Display for Error {
                 std::write!(f, "failed to deserialize value `{field}` from \
                     environment variable `{key}`: {msg}")
             }
-            #[cfg(any(feature = "toml", feature = "yaml", feature = "json5"))]
             ErrorInner::UnsupportedFileFormat { path } => {
                 std::write!(f,
                     "unknown configuration file format/extension: '{}'",
                     path.display(),
                 )
             }
-            #[cfg(any(feature = "toml", feature = "yaml", feature = "json5"))]
             ErrorInner::MissingFileExtension { path } => {
                 std::write!(f,
                     "cannot guess configuration file format due to missing file extension in '{}'",
                     path.display(),
                 )
             }
-            #[cfg(any(feature = "toml", feature = "yaml", feature = "json5"))]
             ErrorInner::MissingRequiredFile { path } => {
                 std::write!(f,
                     "required configuration file does not exist: '{}'",

@@ -49,14 +49,6 @@ impl File {
 
     /// Attempts to load the file into the partial configuration `P`.
     pub fn load<P: Partial>(&self) -> Result<P, Error> {
-        // Unfortunately, if no file format is enabled, this emits unused variable
-        // warnings. This should not happen as `self`, a type containing an empty
-        // enum, is in scope, meaning that the code cannot be reached.
-        #![cfg_attr(
-            not(any(feature = "toml", feature = "yaml", feature = "json5")),
-            allow(unused_variables),
-        )]
-
         // Load file contents. If the file does not exist and was not marked as
         // required, we just return an empty layer.
         let file_content = match fs::read(&self.path) {

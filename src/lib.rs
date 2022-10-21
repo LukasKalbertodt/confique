@@ -18,7 +18,7 @@
 //!
 //! Small example:
 //!
-//! ```rust
+//! ```
 //! use confique::Config;
 //!
 //! #[derive(Config)]
@@ -43,7 +43,7 @@
 //! are somewhat structured or have sections. You can do that by including
 //! other types that implement `Config` with `#[config(nested)]`.
 //!
-//! ```rust
+//! ```
 //! use std::path::PathBuf;
 //! use confique::Config;
 //!
@@ -84,7 +84,7 @@
 //! provided high-level methods of [`Config`], like [`Config::from_file`] and
 //! [`Config::builder`].
 //!
-//! ```rust
+//! ```
 //! use confique::Config;
 //!
 //! # #[derive(Config)]
@@ -118,11 +118,12 @@
 //! type via [`Config::from_partial`]. And you probably also want to use
 //! [`Partial::default_values`] as the last layer.
 //!
-//! ```rust,no_run
-//! # #[cfg(feature = "toml")]
-//! use confique::{Config, File, FileFormat, Partial};
+//! ```no_run
 //! # #[cfg(not(feature = "toml"))]
-//! # use confique::{Config, Partial};
+//! # fn main() {}
+//! # #[cfg(feature = "toml")]
+//! # fn main() -> Result<(), confique::Error> {
+//! use confique::{Config, File, FileFormat, Partial};
 //!
 //! #[derive(Config)]
 //! struct Conf {
@@ -130,11 +131,9 @@
 //! }
 //!
 //! type PartialConf = <Conf as Config>::Partial;
-//! # #[cfg(feature = "toml")]
 //! let from_file: PartialConf = File::with_format("/etc/foo/config", FileFormat::Toml)
 //!     .required()
 //!     .load()?;
-//! # #[cfg(not(feature = "toml"))]
 //! let from_file: PartialConf = todo!();
 //! let manual = PartialConf {
 //!     // Remember: all fields in the partial types are `Option`s!
@@ -144,7 +143,8 @@
 //!
 //! let merged = from_file.with_fallback(manual).with_fallback(defaults);
 //! let config = Conf::from_partial(merged)?;
-//! # Ok::<_, confique::Error>(())
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! ## Using your configuration
@@ -161,9 +161,6 @@
 //! - `toml`: enables TOML support and adds the `toml` dependency.
 //! - `yaml`: enables YAML support and adds the `serde_yaml` dependency.
 //! - `json5`: enables YAML support and adds the `json5` dependency.
-
-#[cfg(any(feature = "toml", feature = "yaml", feature = "json5"))]
-use std::path::PathBuf;
 
 use serde::Deserialize;
 
@@ -430,7 +427,7 @@ pub trait Config: Sized {
     /// let conf = Conf::from_file("config.toml");
     /// ```
     #[cfg(any(feature = "toml", feature = "yaml", feature = "json5"))]
-    fn from_file(path: impl Into<PathBuf>) -> Result<Self, Error> {
+    fn from_file(path: impl Into<std::path::PathBuf>) -> Result<Self, Error> {
         let default_values = Self::Partial::default_values();
         let mut file = File::new(path)?;
         if !default_values.is_complete() {
