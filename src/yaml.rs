@@ -12,6 +12,7 @@ use crate::{
 
 
 /// Options for generating a YAML template.
+#[non_exhaustive]
 pub struct FormatOptions {
     /// Amount of indentation in spaces. Default: 2.
     pub indent: u8,

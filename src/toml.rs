@@ -12,6 +12,7 @@ use crate::{
 
 
 /// Options for generating a TOML template.
+#[non_exhaustive]
 pub struct FormatOptions {
     /// Indentation for nested tables. Default: 0.
     pub indent: u8,

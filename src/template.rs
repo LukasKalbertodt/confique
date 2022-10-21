@@ -90,6 +90,7 @@ pub(crate) trait Formatter {
 }
 
 /// General (non format-dependent) template-formatting options.
+#[non_exhaustive]
 pub struct FormatOptions {
     /// Whether to include doc comments (with your own text and information
     /// about whether a value is required and/or has a default). Default:

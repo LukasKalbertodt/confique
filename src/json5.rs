@@ -12,6 +12,7 @@ use crate::{
 
 
 /// Options for generating a JSON5 template.
+#[non_exhaustive]
 pub struct FormatOptions {
     /// Indentation per level. Default: 2.
     pub indent: u8,
