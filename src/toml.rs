@@ -16,8 +16,8 @@ pub struct FormatOptions {
     /// Indentation for nested tables. Default: 0.
     pub indent: u8,
 
-    /// Non-TOML specific options.
-    general: template::Options,
+    /// Non TOML-specific options.
+    pub general: template::FormatOptions,
 }
 
 impl Default for FormatOptions {

@@ -1,3 +1,9 @@
+//! Utilities for creating a "configuration template".
+//!
+//! A config template is a description of all possible configuration values with
+//! their default values and other information. This is super useful to give to
+//! the users of your application as a starting point.
+
 use std::fmt;
 
 use crate::{Config, meta::{Meta, FieldKind, LeafKind, Expr}};
@@ -7,7 +13,7 @@ use crate::{Config, meta::{Meta, FieldKind, LeafKind, Expr}};
 /// configuration template.
 ///
 /// To implement this yourself, take a look at the existing impls for guidance.
-pub trait Formatter {
+pub(crate) trait Formatter {
     /// A type that is used to print expressions.
     type ExprPrinter: fmt::Display + From<&'static Expr>;
 
@@ -83,8 +89,8 @@ pub trait Formatter {
     }
 }
 
-/// General (non format-dependent) formatting options.
-pub struct Options {
+/// General (non format-dependent) template-formatting options.
+pub struct FormatOptions {
     /// Whether to include doc comments (with your own text and information
     /// about whether a value is required and/or has a default). Default:
     /// `true`.
@@ -94,7 +100,7 @@ pub struct Options {
     /// attribute will have a line like this added:
     ///
     /// ```text
-    /// # Can also be specified via environment variable `FOO`.
+    /// ## Can also be specified via environment variable `FOO`.
     /// ```
     ///
     /// Default: `true`.
@@ -117,13 +123,13 @@ pub struct Options {
     // - Which docs to include from nested objects
 }
 
-impl Options {
+impl FormatOptions {
     fn leaf_field_gap(&self) -> u8 {
         self.leaf_field_gap.unwrap_or(self.comments as u8)
     }
 }
 
-impl Default for Options {
+impl Default for FormatOptions {
     fn default() -> Self {
         Self {
             comments: true,
@@ -139,7 +145,7 @@ impl Default for Options {
 /// If you don't need to use a custom formatter, rather look at the `format`
 /// functions in the format-specific modules (e.g. `toml::format`,
 /// `yaml::format`).
-pub fn format<C: Config>(out: &mut impl Formatter, options: Options) {
+pub(crate) fn format<C: Config>(out: &mut impl Formatter, options: FormatOptions) {
     let meta = &C::META;
 
     // Print root docs.
@@ -155,7 +161,7 @@ pub fn format<C: Config>(out: &mut impl Formatter, options: Options) {
 }
 
 
-fn format_impl(out: &mut impl Formatter, meta: &Meta, options: &Options) {
+fn format_impl(out: &mut impl Formatter, meta: &Meta, options: &FormatOptions) {
     // Output all leaf fields first
     let leaf_fields = meta.fields.iter().filter_map(|f| match &f.kind {
         FieldKind::Leaf { kind, env } => Some((f, kind, env)),

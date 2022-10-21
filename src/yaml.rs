@@ -16,8 +16,8 @@ pub struct FormatOptions {
     /// Amount of indentation in spaces. Default: 2.
     pub indent: u8,
 
-    /// Non-TOML specific options.
-    general: template::Options,
+    /// Non YAML-specific options.
+    pub general: template::FormatOptions,
 }
 
 impl Default for FormatOptions {

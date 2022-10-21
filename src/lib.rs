@@ -201,7 +201,10 @@ pub use self::{
 };
 
 #[cfg(any(feature = "toml", feature = "yaml", feature = "json5"))]
-pub use crate::file::{File, FileFormat};
+pub use crate::{
+    template::FormatOptions,
+    file::{File, FileFormat},
+};
 
 
 /// Derives (automatically implements) [`Config`] for a struct.
