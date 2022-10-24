@@ -147,22 +147,28 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
         }
     });
 
-    let from_env_fields = input.fields.iter().map(|f| {
-        match &f.kind {
-            FieldKind::Leaf { env: Some(key), deserialize_with, .. } => {
-                let field = format!("{}::{}", input.name, f.name);
-                match deserialize_with {
-                    None => quote! {
-                        confique::internal::from_env(#key, #field)?
-                    },
-                    Some(d) => quote! {
-                        confique::internal::from_env_with(#key, #field, #d)?
-                    },
-                }
+    let from_env_fields = input.fields.iter().map(|f| match &f.kind {
+        FieldKind::Leaf {
+            env: Some(key),
+            deserialize_with,
+            parse_env,
+            ..
+        } => {
+            let field = format!("{}::{}", input.name, f.name);
+            match (parse_env, deserialize_with) {
+                (None, None) => quote! {
+                    confique::internal::from_env(#key, #field)?
+                },
+                (None, Some(deserialize_with)) => quote! {
+                    confique::internal::deserialize_from_env_with(#key, #field, #deserialize_with)?
+                },
+                (Some(parse_env), None) | (Some(parse_env), Some(_)) => quote! {
+                    confique::internal::parse_from_env_with(#key, #field, #parse_env)?
+                },
             }
-            FieldKind::Leaf { .. } => quote! { None },
-            FieldKind::Nested { .. } => quote! { confique::Partial::from_env()? },
         }
+        FieldKind::Leaf { .. } => quote! { None },
+        FieldKind::Nested { .. } => quote! { confique::Partial::from_env()? },
     });
 
     let fallbacks = input.fields.iter().map(|f| {

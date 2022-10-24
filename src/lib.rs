@@ -176,6 +176,7 @@ pub mod internal;
 
 mod builder;
 mod env;
+pub use env::env_utils;
 mod error;
 pub mod meta;
 
@@ -322,6 +323,9 @@ pub use crate::{
 ///
 /// [serde-deser]: https://serde.rs/field-attrs.html#deserialize_with
 ///
+/// - **`#[config(from_env = path::to::function, env = "KEY")]`**: like
+///   deserialize_with` attribute, but only for fields from an environment variable. 
+///   Can only be present if the `env` attribute is present
 ///
 /// ## Special types for leaf fields
 ///

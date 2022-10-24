@@ -1,5 +1,7 @@
 use std::{collections::HashMap, net::IpAddr, path::PathBuf};
+
 use pretty_assertions::assert_eq;
+use serde::Deserialize;
 
 use confique::{meta, Config, Partial};
 
@@ -110,6 +112,9 @@ mod full {
 
         #[config(env = "ENV_TEST_FULL_3")]
         optional: Option<PathBuf>,
+
+        #[config(env = "ENV_TEST_FULL_4", parse_env = parse_dummy_collection)]
+        env_collection: DummyCollection<','>,
     }
 }
 
@@ -247,6 +252,14 @@ fn full() {
                                     kind: meta::LeafKind::Optional,
                                 },
                             },
+                            meta::Field {
+                                name: "env_collection",
+                                doc: &[],
+                                kind: meta::FieldKind::Leaf {
+                                    env: Some("ENV_TEST_FULL_4"),
+                                    kind: meta::LeafKind::Required { default: None },
+                                },
+                            },
                         ],
                     },
                 },
@@ -266,6 +279,7 @@ fn full() {
     assert_eq!(def.env.required, None);
     assert_eq!(def.env.with_default, Some(8080));
     assert_eq!(def.env.optional, None);
+    assert_eq!(def.env.env_collection, None);
 }
 
 #[derive(Debug, PartialEq)]
@@ -275,10 +289,17 @@ pub(crate) fn deserialize_dummy<'de, D>(deserializer: D) -> Result<Dummy, D::Err
 where
     D: serde::Deserializer<'de>,
 {
-    use serde::Deserialize;
-
     let s = String::deserialize(deserializer)?;
     Ok(Dummy(format!("dummy {s}")))
+}
+
+#[derive(Debug, PartialEq, Deserialize)]
+struct DummyCollection<const SEPARATOR: char>(Vec<String>);
+
+pub(crate) fn parse_dummy_collection<const SEPARATOR: char>(input: &str) -> Result<DummyCollection<SEPARATOR>, String> {
+    Ok(DummyCollection(
+        input.split(SEPARATOR).map(ToString::to_string).collect(),
+    ))
 }
 
 // This only makes sure this compiles and doesn't result in any "cannot infer

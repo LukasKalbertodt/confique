@@ -2,8 +2,9 @@
 //! intended to be used directly. None of this is covered by semver! Do not use
 //! any of this directly.
 
-use crate::{error::ErrorInner, Error};
+use std::fmt::Debug;
 
+use crate::{error::ErrorInner, Error};
 
 pub fn deserialize_default<I, O>(src: I) -> Result<O, serde::de::value::Error>
 where
@@ -41,10 +42,29 @@ pub fn from_env<'de, T: serde::Deserialize<'de>>(
     key: &str,
     field: &str,
 ) -> Result<Option<T>, Error> {
-    from_env_with(key, field, |de| T::deserialize(de))
+    deserialize_from_env_with(key, field, |de| T::deserialize(de))
 }
 
-pub fn from_env_with<T>(
+pub fn parse_from_env_with<T, E: Debug>(
+    key: &str,
+    field: &str,
+    parse: fn(&str) -> Result<T, E>,
+) -> Result<Option<T>, Error> {
+    from_env::<String>(key, field)?
+        .as_deref()
+        .map(parse)
+        .transpose()
+        .map_err(|err| {
+            ErrorInner::EnvDeserialization {
+                field: field.to_owned(),
+                key: key.to_owned(),
+                msg: format!("Error while parse: {:?}", err),
+            }
+            .into()
+        })
+}
+
+pub fn deserialize_from_env_with<T>(
     key: &str,
     field: &str,
     deserialize: fn(crate::env::Deserializer) -> Result<T, crate::env::DeError>,
