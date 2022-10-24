@@ -1,11 +1,7 @@
-use std::collections::HashMap;
-use std::{
-    net::IpAddr,
-    path::PathBuf,
-};
+use std::{collections::HashMap, net::IpAddr, path::PathBuf};
 
-use crate::Config;
 use crate as confique;
+use crate::Config;
 
 #[derive(Debug, Config)]
 /// A sample configuration for our app.

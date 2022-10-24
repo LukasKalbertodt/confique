@@ -13,7 +13,10 @@ pub struct Error {
 // instead of repeating this cfg-attribute a lot in the rest of the file, we
 // just live with these unused variants. It's not like we need to optimize the
 // size of `ErrorInner`.
-#[cfg_attr(not(any(feature = "toml", feature = "yaml", feature = "json5")), allow(dead_code))]
+#[cfg_attr(
+    not(any(feature = "toml", feature = "yaml", feature = "json5")),
+    allow(dead_code)
+)]
 pub(crate) enum ErrorInner {
     /// Returned by `Config::from_partial` when the partial does not contain
     /// values for all required configuration values. The string is a
@@ -37,10 +40,7 @@ pub(crate) enum ErrorInner {
     },
 
     /// When the env variable `key` is not Unicode.
-    EnvNotUnicode {
-        field: String,
-        key: String,
-    },
+    EnvNotUnicode { field: String, key: String },
 
     /// When deserialization via `env` fails. The string is what is passed to
     /// `serde::de::Error::custom`.
@@ -53,20 +53,14 @@ pub(crate) enum ErrorInner {
     /// Returned by the [`Source`] impls for `Path` and `PathBuf` if the file
     /// extension is not supported by confique or if the corresponding Cargo
     /// feature of confique was not enabled.
-    UnsupportedFileFormat {
-        path: PathBuf,
-    },
+    UnsupportedFileFormat { path: PathBuf },
 
     /// Returned by the [`Source`] impls for `Path` and `PathBuf` if the path
     /// does not contain a file extension.
-    MissingFileExtension {
-        path: PathBuf,
-    },
+    MissingFileExtension { path: PathBuf },
 
     /// A file source was marked as required but the file does not exist.
-    MissingRequiredFile {
-        path: PathBuf,
-    }
+    MissingRequiredFile { path: PathBuf },
 }
 
 impl std::error::Error for Error {

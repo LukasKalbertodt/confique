@@ -4,9 +4,9 @@
 use std::fmt::{self, Write};
 
 use crate::{
-    Config,
-    template::{self, Formatter},
     meta::Expr,
+    template::{self, Formatter},
+    Config,
 };
 
 
@@ -147,7 +147,10 @@ impl Formatter for YamlFormatter {
     }
 
     fn end_nested(&mut self) {
-        self.depth = self.depth.checked_sub(1).expect("formatter bug: ended too many nested");
+        self.depth = self
+            .depth
+            .checked_sub(1)
+            .expect("formatter bug: ended too many nested");
     }
 
     fn start_main(&mut self) {
@@ -200,7 +203,7 @@ impl fmt::Display for PrintExpr<'_> {
                 }
                 f.write_str(" }")?;
                 Ok(())
-            },
+            }
 
             // All these other types can simply be serialized as is.
             Expr::Str(_) | Expr::Float(_) | Expr::Integer(_) | Expr::Bool(_) => {
@@ -221,9 +224,11 @@ impl fmt::Display for PrintExpr<'_> {
 
 #[cfg(test)]
 mod tests {
+    use pretty_assertions::assert_str_eq;
+
     use crate::test_utils::{self, include_format_output};
     use super::{template, FormatOptions};
-    use pretty_assertions::assert_str_eq;
+
 
     #[test]
     fn default() {

@@ -1,6 +1,6 @@
 use std::{ffi::OsStr, fs, io, path::PathBuf};
 
-use crate::{Error, Partial, error::ErrorInner};
+use crate::{error::ErrorInner, Error, Partial};
 
 
 /// A file as source for configuration.
@@ -20,12 +20,11 @@ impl File {
     /// unknown, an error is returned.
     pub fn new(path: impl Into<PathBuf>) -> Result<Self, Error> {
         let path = path.into();
-        let ext = path.extension().ok_or_else(|| {
-            ErrorInner::MissingFileExtension { path: path.clone() }
-        })?;
-        let format = FileFormat::from_extension(ext).ok_or_else(|| {
-            ErrorInner::UnsupportedFileFormat { path: path.clone() }
-        })?;
+        let ext = path
+            .extension()
+            .ok_or_else(|| ErrorInner::MissingFileExtension { path: path.clone() })?;
+        let format = FileFormat::from_extension(ext)
+            .ok_or_else(|| ErrorInner::UnsupportedFileFormat { path: path.clone() })?;
 
         Ok(Self::with_format(path, format))
     }
@@ -69,10 +68,12 @@ impl File {
         };
 
         // Helper closure to create an error.
-        let error = |err| Error::from(ErrorInner::Deserialization {
-            err,
-            source: Some(format!("file '{}'", self.path.display())),
-        });
+        let error = |err| {
+            Error::from(ErrorInner::Deserialization {
+                err,
+                source: Some(format!("file '{}'", self.path.display())),
+            })
+        };
 
         match self.format {
             #[cfg(feature = "toml")]
@@ -87,7 +88,7 @@ impl File {
             FileFormat::Json5 => {
                 let s = std::str::from_utf8(&file_content).map_err(|e| error(Box::new(e)))?;
                 json5::from_str(s).map_err(|e| error(Box::new(e)))
-            },
+            }
         }
     }
 }
@@ -96,9 +97,12 @@ impl File {
 ///
 /// All enum variants are `#[cfg]` guarded with the respective crate feature.
 pub enum FileFormat {
-    #[cfg(feature = "toml")] Toml,
-    #[cfg(feature = "yaml")] Yaml,
-    #[cfg(feature = "json5")] Json5,
+    #[cfg(feature = "toml")]
+    Toml,
+    #[cfg(feature = "yaml")]
+    Yaml,
+    #[cfg(feature = "json5")]
+    Json5,
 }
 
 impl FileFormat {

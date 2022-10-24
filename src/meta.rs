@@ -40,9 +40,7 @@ pub enum FieldKind {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum LeafKind {
     /// A leaf field with a non `Option<_>` type.
-    Required {
-        default: Option<Expr>,
-    },
+    Required { default: Option<Expr> },
     /// A leaf field with an `Option<_>` type.
     Optional,
 }
@@ -59,7 +57,7 @@ pub enum Expr {
 
     /// A key value map, stored as slice in source code order.
     #[serde(serialize_with = "serialize_map")]
-    Map(&'static [MapEntry])
+    Map(&'static [MapEntry]),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize)]

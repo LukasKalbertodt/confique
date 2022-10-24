@@ -2,7 +2,8 @@
 //! intended to be used directly. None of this is covered by semver! Do not use
 //! any of this directly.
 
-use crate::{Error, error::ErrorInner};
+use crate::{error::ErrorInner, Error};
+
 
 pub fn deserialize_default<I, O>(src: I) -> Result<O, serde::de::value::Error>
 where
@@ -22,7 +23,7 @@ where
 pub fn unwrap_or_missing_value_err<T>(value: Option<T>, path: &str) -> Result<T, Error> {
     match value {
         Some(v) => Ok(v),
-        None => Err(ErrorInner::MissingValue(path.into()).into())
+        None => Err(ErrorInner::MissingValue(path.into()).into()),
     }
 }
 
@@ -50,10 +51,13 @@ pub fn from_env_with<T>(
 ) -> Result<Option<T>, Error> {
     let s = match std::env::var(key) {
         Err(std::env::VarError::NotPresent) => return Ok(None),
-        Err(std::env::VarError::NotUnicode(_)) => return Err(ErrorInner::EnvNotUnicode {
-            key: key.into(),
-            field: field.into(),
-        }.into()),
+        Err(std::env::VarError::NotUnicode(_)) => {
+            let err = ErrorInner::EnvNotUnicode {
+                key: key.into(),
+                field: field.into(),
+            };
+            return Err(err.into());
+        }
         Ok(s) => s,
     };
 

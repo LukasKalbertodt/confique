@@ -120,7 +120,10 @@ impl Json5Formatter {
     }
 
     fn dec_depth(&mut self) {
-        self.depth = self.depth.checked_sub(1).expect("formatter bug: ended too many nested");
+        self.depth = self
+            .depth
+            .checked_sub(1)
+            .expect("formatter bug: ended too many nested");
     }
 }
 
@@ -191,8 +194,8 @@ impl fmt::Display for PrintExpr {
 
 #[cfg(test)]
 mod tests {
-    use crate::test_utils::{self, include_format_output};
     use super::{template, FormatOptions};
+    use crate::test_utils::{self, include_format_output};
     use pretty_assertions::assert_str_eq;
 
     #[test]

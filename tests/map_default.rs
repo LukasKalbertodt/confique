@@ -1,7 +1,7 @@
 use std::collections::HashMap;
-
 use pretty_assertions::assert_eq;
-use confique::{Config, meta};
+
+use confique::{meta, Config};
 
 
 #[test]

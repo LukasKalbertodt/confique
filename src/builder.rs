@@ -19,9 +19,7 @@ pub struct Builder<C: Config> {
 
 impl<C: Config> Builder<C> {
     pub(crate) fn new() -> Self {
-        Self {
-            sources: vec![],
-        }
+        Self { sources: vec![] }
     }
 
     /// Adds a configuration file as source. Infers the format from the file

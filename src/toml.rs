@@ -4,9 +4,9 @@
 use std::fmt::{self, Write};
 
 use crate::{
-    Config,
-    template::{self, Formatter},
     meta::{Expr, MapKey},
+    template::{self, Formatter},
+    Config,
 };
 
 
@@ -205,9 +205,10 @@ fn is_valid_bare_key(s: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use pretty_assertions::assert_str_eq;
+
     use crate::test_utils::{self, include_format_output};
     use super::{template, FormatOptions};
-    use pretty_assertions::assert_str_eq;
 
     #[test]
     fn default() {

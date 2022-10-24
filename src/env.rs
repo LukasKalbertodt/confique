@@ -52,14 +52,13 @@ macro_rules! deserialize_via_parse {
     ($method:ident, $visit_method:ident, $int:ident) => {
         fn $method<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
-            V: serde::de::Visitor<'de>
+            V: serde::de::Visitor<'de>,
         {
             let s = self.value.trim();
             let v = s.parse().map_err(|e| {
                 DeError(format!(
                     concat!("invalid value '{}' for type ", stringify!($int), ": {}"),
-                    s,
-                    e,
+                    s, e,
                 ))
             })?;
             visitor.$visit_method(v)
@@ -72,14 +71,14 @@ impl<'de> serde::Deserializer<'de> for Deserializer {
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: serde::de::Visitor<'de>
+        V: serde::de::Visitor<'de>,
     {
         self.value.into_deserializer().deserialize_any(visitor)
     }
 
     fn deserialize_bool<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: serde::de::Visitor<'de>
+        V: serde::de::Visitor<'de>,
     {
         let v = match self.value.trim() {
             "1" | "true" | "TRUE" => true,

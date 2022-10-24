@@ -1,7 +1,7 @@
-use std::{path::PathBuf, net::IpAddr, collections::HashMap};
-
+use std::{collections::HashMap, net::IpAddr, path::PathBuf};
 use pretty_assertions::assert_eq;
-use confique::{Config, meta, Partial};
+
+use confique::{meta, Config, Partial};
 
 
 #[test]
@@ -272,7 +272,8 @@ fn full() {
 struct Dummy(String);
 
 pub(crate) fn deserialize_dummy<'de, D>(deserializer: D) -> Result<Dummy, D::Error>
-    where D: serde::Deserializer<'de>,
+where
+    D: serde::Deserializer<'de>,
 {
     use serde::Deserialize;
 

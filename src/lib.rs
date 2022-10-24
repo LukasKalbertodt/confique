@@ -206,8 +206,8 @@ pub use self::{
 
 #[cfg(any(feature = "toml", feature = "yaml", feature = "json5"))]
 pub use crate::{
-    template::FormatOptions,
     file::{File, FileFormat},
+    template::FormatOptions,
 };
 
 
