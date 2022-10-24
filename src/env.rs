@@ -10,7 +10,7 @@ use serde::de::IntoDeserializer;
 /// Semantically private, only public as it's used in the API of the `internal`
 /// module. Gets converted into `ErrorKind::EnvDeserialization` before reaching
 /// the real public API.
-#[derive(PartialEq)]
+#[derive(PartialEq, Eq)]
 pub struct DeError(pub(crate) String);
 
 impl std::error::Error for DeError {}

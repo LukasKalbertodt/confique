@@ -222,7 +222,7 @@ fn format_impl(out: &mut impl Formatter, meta: &Meta, options: &FormatOptions) {
         emitted_anything = true;
 
         let comments = if options.comments { field.doc } else { &[] };
-        out.start_nested(&field.name, comments);
+        out.start_nested(field.name, comments);
         format_impl(out, meta, options);
         out.end_nested();
     }

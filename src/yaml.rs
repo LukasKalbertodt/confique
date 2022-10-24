@@ -197,7 +197,7 @@ impl fmt::Display for PrintExpr<'_> {
                     if i != 0 {
                         f.write_str(", ")?;
                     }
-                    PrintExpr(&entry.key.clone().into()).fmt(f)?;
+                    PrintExpr(&entry.key.into()).fmt(f)?;
                     f.write_str(": ")?;
                     PrintExpr(&entry.value).fmt(f)?;
                 }

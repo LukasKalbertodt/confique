@@ -180,7 +180,7 @@ impl fmt::Display for PrintExpr<'_> {
 
                     match entry.key {
                         MapKey::Str(s) if is_valid_bare_key(s) => f.write_str(s)?,
-                        _ => PrintExpr(&entry.key.clone().into()).fmt(f)?,
+                        _ => PrintExpr(&entry.key.into()).fmt(f)?,
                     }
                     f.write_str(" = ")?;
                     PrintExpr(&entry.value).fmt(f)?;
