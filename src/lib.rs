@@ -175,8 +175,7 @@ use serde::Deserialize;
 pub mod internal;
 
 mod builder;
-mod env;
-pub use env::env_utils;
+pub mod env;
 mod error;
 pub mod meta;
 

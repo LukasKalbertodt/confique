@@ -11,6 +11,7 @@ use serde::de::IntoDeserializer;
 /// module. Gets converted into `ErrorKind::EnvDeserialization` before reaching
 /// the real public API.
 #[derive(PartialEq, Eq)]
+#[doc(hidden)]
 pub struct DeError(pub(crate) String);
 
 impl std::error::Error for DeError {}
@@ -38,6 +39,7 @@ impl serde::de::Error for DeError {
 
 
 /// Deserializer type. Semantically private (see `DeError`).
+#[doc(hidden)]
 pub struct Deserializer {
     value: String,
 }
@@ -167,104 +169,60 @@ mod tests {
     }
 }
 
-/// This module contains helper methods to simplify configuration via environment variables
-pub mod env_utils {
+/// Functions for the `#[config(parse_env = ...)]` attribute.
+pub mod parse {
     use std::str::FromStr;
 
-    /// Helper function to parse any type that implements [`std::str::FromStr`]
-    /// into a collection that implements [`std::iter::FromIterator`], spliting original string by
-    /// const char separator.
+    /// Splits the environment variable by separator `SEP`, parses each element
+    /// with [`FromStr`] and collects everything via [`FromIterator`].
     ///
-    /// # To Vec
+    /// To avoid having to specify the separator via `::<>` syntax, see the
+    /// other functions in this module.
+    ///
+    /// [`FromStr`]: std::str::FromStr
+    /// [`FromIterator`]: std::iter::FromIterator
+    ///
+    ///
+    /// # Example
+    ///
     /// ```
-    /// use crate::confique::Config;
+    /// use confique::Config;
+    ///
     /// #[derive(Debug, confique::Config)]
     /// struct Conf {
-    ///     #[config(
-    ///         env = "PORTS",
-    ///         parse_env = confique::env_utils::to_collection_by_char_separator::<',', _, _>
-    ///     )]
-    ///     ports: Vec<u16>
+    ///     #[config(env = "PORTS", parse_env = confique::env::parse::list_by_sep::<',', _, _>)]
+    ///     ports: Vec<u16>,
     /// }
     ///
     /// std::env::set_var("PORTS", "8080,8000,8888");
-    /// println!("{:?}", Conf::builder().env().load().unwrap())
+    /// let conf = Conf::builder().env().load()?;
+    /// assert_eq!(conf.ports, vec![8080, 8000, 8888]);
+    /// # Ok::<_, confique::Error>(())
     /// ```
-    ///
-    /// # To HashSet
-    /// ```
-    /// use crate::confique::Config;
-    /// #[derive(Debug, confique::Config)]
-    /// struct Conf {
-    ///     #[config(
-    ///         env = "PATHS",
-    ///         parse_env = confique::env_utils::to_collection_by_char_separator::<';', _, _>
-    ///     )]
-    ///     paths: std::collections::HashSet<std::path::PathBuf>,
-    /// }
-    ///
-    /// std::env::set_var("PATHS", "/bin;/user/bin;/home/user/.cargo/bin");
-    /// println!("{:?}", Conf::builder().env().load().unwrap())
-    /// ```
-    pub fn to_collection_by_char_separator<
-        const SEPARATOR: char,
+    pub fn list_by_sep<const SEP: char, T, C>(input: &str) -> Result<C, <T as FromStr>::Err>
+    where
         T: FromStr,
-        C: FromIterator<Result<T, <T as FromStr>::Err>>,
-    >(
-        input: &str,
-    ) -> C {
-        input.split(SEPARATOR.to_owned()).map(T::from_str).collect()
+        C: FromIterator<T>,
+    {
+        input.split(SEP).map(T::from_str).collect()
     }
 
+
     macro_rules! specify_fn_wrapper {
-        ($symbol_name:ident, $symbol:tt) => {
-            ::paste::paste! {
-                /// Helper function to parse any type that implements [`std::str::FromStr`]
-                /// into a collection that implements [`std::iter::FromIterator`], spliting original string by
-                #[doc = stringify!($symbol_name)]
-                /// .
-                ///
-                /// # To Vec
-                /// ```
-                /// use crate::confique::Config;
-                /// #[derive(Debug, confique::Config)]
-                /// struct Conf {
-                ///     #[config(
-                ///         env = "PORTS",
-                #[doc = concat!("         parse_env = confique::env_utils::", stringify!([<to_collection_by_ $symbol_name>],))]
-                ///     )]
-                ///     ports: Vec<u16>
-                /// }
-                ///
-                #[doc = concat!("std::env::set_var(\"PORTS\", \"8080", $symbol, "8000", $symbol, "8888", "\");")]
-                /// println!("{:#?}", Conf::builder().env().load().unwrap())
-                /// ```
-                ///
-                /// # To HashSet
-                /// ```
-                /// use crate::confique::Config;
-                /// #[derive(Debug, confique::Config)]
-                /// struct Conf {
-                ///     #[config(
-                ///         env = "PATHS",
-                #[doc = concat!("         parse_env = confique::env_utils::", stringify!([<to_collection_by_ $symbol_name>],))]
-                ///     )]
-                ///     paths: std::collections::HashSet<std::path::PathBuf>,
-                /// }
-                ///
-                #[doc = concat!("std::env::set_var(\"PATHS\", \"/bin", $symbol, "/user/bin", $symbol, "/home/user/.cargo/bin", "\");")]
-                /// println!("{:#?}", Conf::builder().env().load().unwrap())
-                /// ```
-                pub fn [<to_collection_by_ $symbol_name>]<T: FromStr, C: FromIterator<Result<T, <T as FromStr>::Err>>>(
-                    input: &str,
-                ) -> C {
-                    to_collection_by_char_separator::<$symbol, _, _>(input)
-                }
+        ($fn_name:ident, $sep:literal) => {
+            #[doc = concat!("Like [`list_by_sep`] with `", $sep, "` separator.")]
+            pub fn $fn_name<T, C>(input: &str) -> Result<C, <T as FromStr>::Err>
+            where
+                T: FromStr,
+                C: FromIterator<T>,
+            {
+                list_by_sep::<$sep, _, _>(input)
             }
         }
     }
 
-    specify_fn_wrapper!(comma, ',');
-    specify_fn_wrapper!(semicolon, ';');
-    specify_fn_wrapper!(space, ' ');
+    specify_fn_wrapper!(list_by_comma, ',');
+    specify_fn_wrapper!(list_by_semicolon, ';');
+    specify_fn_wrapper!(list_by_colon, ':');
+    specify_fn_wrapper!(list_by_space, ' ');
 }
