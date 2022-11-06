@@ -2,8 +2,6 @@
 //! intended to be used directly. None of this is covered by semver! Do not use
 //! any of this directly.
 
-use std::fmt::Debug;
-
 use crate::{error::ErrorInner, Error};
 
 pub fn deserialize_default<I, O>(src: I) -> Result<O, serde::de::value::Error>
@@ -38,48 +36,53 @@ pub fn map_err_prefix_path<T>(res: Result<T, Error>, prefix: &str) -> Result<T, 
     })
 }
 
+
+macro_rules! get_env_var {
+    ($key:expr, $field:expr) => {
+        match std::env::var($key) {
+            Err(std::env::VarError::NotPresent) => return Ok(None),
+            Err(std::env::VarError::NotUnicode(_)) => {
+                let err = ErrorInner::EnvNotUnicode {
+                    key: $key.into(),
+                    field: $field.into(),
+                };
+                return Err(err.into());
+            }
+            Ok(s) => s,
+        }
+    };
+}
+
 pub fn from_env<'de, T: serde::Deserialize<'de>>(
     key: &str,
     field: &str,
 ) -> Result<Option<T>, Error> {
-    deserialize_from_env_with(key, field, |de| T::deserialize(de))
+    from_env_with_deserializer(key, field, |de| T::deserialize(de))
 }
 
-pub fn parse_from_env_with<T, E: Debug>(
+pub fn from_env_with_parser<T, E: std::error::Error + Send + Sync + 'static>(
     key: &str,
     field: &str,
     parse: fn(&str) -> Result<T, E>,
 ) -> Result<Option<T>, Error> {
-    from_env::<String>(key, field)?
-        .as_deref()
-        .map(parse)
-        .transpose()
+    let v = get_env_var!(key, field);
+    parse(&v)
+        .map(Some)
         .map_err(|err| {
-            ErrorInner::EnvDeserialization {
+            ErrorInner::EnvParseError {
                 field: field.to_owned(),
                 key: key.to_owned(),
-                msg: format!("Error while parse: {:?}", err),
-            }
-            .into()
+                err: Box::new(err),
+            }.into()
         })
 }
 
-pub fn deserialize_from_env_with<T>(
+pub fn from_env_with_deserializer<T>(
     key: &str,
     field: &str,
     deserialize: fn(crate::env::Deserializer) -> Result<T, crate::env::DeError>,
 ) -> Result<Option<T>, Error> {
-    let s = match std::env::var(key) {
-        Err(std::env::VarError::NotPresent) => return Ok(None),
-        Err(std::env::VarError::NotUnicode(_)) => {
-            let err = ErrorInner::EnvNotUnicode {
-                key: key.into(),
-                field: field.into(),
-            };
-            return Err(err.into());
-        }
-        Ok(s) => s,
-    };
+    let s = get_env_var!(key, field);
 
     match deserialize(crate::env::Deserializer::new(s)) {
         Ok(v) => Ok(Some(v)),

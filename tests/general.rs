@@ -1,4 +1,4 @@
-use std::{collections::HashMap, net::IpAddr, path::PathBuf};
+use std::{collections::HashMap, net::IpAddr, path::PathBuf, convert::Infallible};
 
 use pretty_assertions::assert_eq;
 use serde::Deserialize;
@@ -114,7 +114,7 @@ mod full {
         optional: Option<PathBuf>,
 
         #[config(env = "ENV_TEST_FULL_4", parse_env = parse_dummy_collection)]
-        env_collection: DummyCollection<','>,
+        env_collection: DummyCollection,
     }
 }
 
@@ -294,11 +294,11 @@ where
 }
 
 #[derive(Debug, PartialEq, Deserialize)]
-struct DummyCollection<const SEPARATOR: char>(Vec<String>);
+struct DummyCollection(Vec<String>);
 
-pub(crate) fn parse_dummy_collection<const SEPARATOR: char>(input: &str) -> Result<DummyCollection<SEPARATOR>, String> {
+pub(crate) fn parse_dummy_collection(input: &str) -> Result<DummyCollection, Infallible> {
     Ok(DummyCollection(
-        input.split(SEPARATOR).map(ToString::to_string).collect(),
+        input.split(',').map(ToString::to_string).collect(),
     ))
 }
 

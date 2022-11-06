@@ -156,10 +156,11 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
                         confique::internal::from_env(#key, #field)?
                     },
                     (None, Some(deserialize_with)) => quote! {
-                        confique::internal::deserialize_from_env_with(#key, #field, #deserialize_with)?
+                        confique::internal::from_env_with_deserializer(
+                            #key, #field, #deserialize_with)?
                     },
-                    (Some(parse_env), None) | (Some(parse_env), Some(_)) => quote! {
-                        confique::internal::parse_from_env_with(#key, #field, #parse_env)?
+                    (Some(parse_env), _) => quote! {
+                        confique::internal::from_env_with_parser(#key, #field, #parse_env)?
                     },
                 }
             }

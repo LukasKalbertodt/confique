@@ -50,6 +50,13 @@ pub(crate) enum ErrorInner {
         msg: String,
     },
 
+    /// When a custom `parse_env` function fails.
+    EnvParseError {
+        field: String,
+        key: String,
+        err: Box<dyn std::error::Error + Send + Sync>,
+    },
+
     /// Returned by the [`Source`] impls for `Path` and `PathBuf` if the file
     /// extension is not supported by confique or if the corresponding Cargo
     /// feature of confique was not enabled.
@@ -71,6 +78,7 @@ impl std::error::Error for Error {
             ErrorInner::MissingValue(_) => None,
             ErrorInner::EnvNotUnicode { .. } => None,
             ErrorInner::EnvDeserialization { .. } => None,
+            ErrorInner::EnvParseError { err, .. } => Some(&**err),
             ErrorInner::UnsupportedFileFormat { .. } => None,
             ErrorInner::MissingFileExtension { .. } => None,
             ErrorInner::MissingRequiredFile { .. } => None,
@@ -106,6 +114,10 @@ impl fmt::Display for Error {
             ErrorInner::EnvDeserialization { field, key, msg } => {
                 std::write!(f, "failed to deserialize value `{field}` from \
                     environment variable `{key}`: {msg}")
+            }
+            ErrorInner::EnvParseError { field, key, err } => {
+                std::write!(f, "failed to parse environment variable `{key}` into \
+                    field `{field}`: {err}")
             }
             ErrorInner::UnsupportedFileFormat { path } => {
                 std::write!(f,

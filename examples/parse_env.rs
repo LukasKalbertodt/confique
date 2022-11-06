@@ -6,7 +6,7 @@ use confique::{
     },
     Config,
 };
-use std::{collections::HashSet, num::NonZeroU64, path::PathBuf, str::FromStr};
+use std::{collections::HashSet, num::NonZeroU64, path::PathBuf, str::FromStr, convert::Infallible};
 
 #[derive(Debug, Config)]
 struct Conf {
@@ -45,10 +45,7 @@ enum Format {
     Yaml,
 }
 
-#[derive(Debug)]
-enum Error {}
-
-fn parse_formats(input: &str) -> Result<Vec<Format>, Error> {
+fn parse_formats(input: &str) -> Result<Vec<Format>, Infallible> {
     let mut result = Vec::new();
 
     if input.contains("toml") {
