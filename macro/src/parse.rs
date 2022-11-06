@@ -71,21 +71,24 @@ impl Field {
                     "A `parse_env` attribute, cannot be provided without the `env` attribute",
                 ));
             }
+
+            let kind = match unwrap_option(&field.ty) {
+                Some(_) if attrs.default.is_some() => {
+                    return Err(Error::new(
+                        field.ident.span(),
+                        "optional fields (type `Option<_>`) cannot have default \
+                            values (`#[config(default = ...)]`)",
+                    ));
+                },
+                Some(inner) => LeafKind::Optional { inner_ty: inner.clone() },
+                None => LeafKind::Required { default: attrs.default, ty: field.ty },
+            };
+
             FieldKind::Leaf {
                 env: attrs.env,
                 deserialize_with: attrs.deserialize_with,
                 parse_env: attrs.parse_env,
-                kind: match unwrap_option(&field.ty) {
-                    Some(_inner) if attrs.default.is_some() => {
-                        return Err(Error::new(
-                            field.ident.span(),
-                            "optional fields (type `Option<_>`) cannot have default \
-                                values (`#[config(default = ...)]`)",
-                        ));
-                    },
-                    Some(inner) => LeafKind::Optional { inner_ty: inner.clone() },
-                    None => LeafKind::Required { default: attrs.default, ty: field.ty },
-                },
+                kind,
             }
         };
 
