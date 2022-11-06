@@ -175,7 +175,7 @@ use serde::Deserialize;
 pub mod internal;
 
 mod builder;
-mod env;
+pub mod env;
 mod error;
 pub mod meta;
 
@@ -320,8 +320,14 @@ pub use crate::{
 /// - **`#[config(deserialize_with = path::to::function)]`**: like
 ///   [serde's `deserialize_with` attribute][serde-deser].
 ///
-/// [serde-deser]: https://serde.rs/field-attrs.html#deserialize_with
+/// - **`#[config(parse_env = path::to::function)]`**: function used to parse
+///     environment variables. Mostly useful if you need to parse lists or
+///     other complex objects from env vars. Function needs signature
+///     `fn(&str) -> Result<T, impl std::error::Error>` where `T` is the type of
+///     the field.. Can only be present if the `env` attribute is present. Also
+///     see [`env::parse`].
 ///
+/// [serde-deser]: https://serde.rs/field-attrs.html#deserialize_with
 ///
 /// ## Special types for leaf fields
 ///

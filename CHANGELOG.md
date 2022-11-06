@@ -4,7 +4,9 @@ All notable changes to this project will be documented in this file.
 
 
 ## [Unreleased]
-
+### Added
+- `parse_env` attribute for custom parsing of environment variables (allows you
+  to load lists and other complex objects from env vars).
 
 ## [0.2.0] - 2022-10-21
 ### Added

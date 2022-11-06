@@ -24,6 +24,7 @@ pub(crate) enum FieldKind {
     Leaf {
         env: Option<String>,
         deserialize_with: Option<syn::Path>,
+        parse_env: Option<syn::Path>,
         kind: LeafKind,
     },
 

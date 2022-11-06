@@ -65,32 +65,30 @@ impl Field {
 
             FieldKind::Nested { ty: field.ty }
         } else {
-            match unwrap_option(&field.ty) {
-                None => FieldKind::Leaf {
-                    env: attrs.env,
-                    deserialize_with: attrs.deserialize_with,
-                    kind: LeafKind::Required {
-                        default: attrs.default,
-                        ty: field.ty,
-                    },
-                },
-                Some(inner) => {
-                    if attrs.default.is_some() {
-                        return Err(Error::new(
-                            field.ident.span(),
-                            "optional fields (type `Option<_>`) cannot have default \
-                                values (`#[config(default = ...)]`)",
-                        ));
-                    }
+            if attrs.env.is_none() && attrs.parse_env.is_some() {
+                return Err(Error::new(
+                    field.ident.span(),
+                    "A `parse_env` attribute, cannot be provided without the `env` attribute",
+                ));
+            }
 
-                    FieldKind::Leaf {
-                        env: attrs.env,
-                        deserialize_with: attrs.deserialize_with,
-                        kind: LeafKind::Optional {
-                            inner_ty: inner.clone(),
-                        },
-                    }
-                }
+            let kind = match unwrap_option(&field.ty) {
+                Some(_) if attrs.default.is_some() => {
+                    return Err(Error::new(
+                        field.ident.span(),
+                        "optional fields (type `Option<_>`) cannot have default \
+                            values (`#[config(default = ...)]`)",
+                    ));
+                },
+                Some(inner) => LeafKind::Optional { inner_ty: inner.clone() },
+                None => LeafKind::Required { default: attrs.default, ty: field.ty },
+            };
+
+            FieldKind::Leaf {
+                env: attrs.env,
+                deserialize_with: attrs.deserialize_with,
+                parse_env: attrs.parse_env,
+                kind,
             }
         };
 
@@ -242,6 +240,10 @@ fn extract_internal_attrs(
                     duplicate_if!(out.env.is_some());
                     out.env = Some(key);
                 }
+                InternalAttr::ParseEnv(path) => {
+                    duplicate_if!(out.parse_env.is_some());
+                    out.parse_env = Some(path);
+                }
                 InternalAttr::DeserializeWith(path) => {
                     duplicate_if!(out.deserialize_with.is_some());
                     out.deserialize_with = Some(path);
@@ -259,6 +261,7 @@ struct InternalAttrs {
     default: Option<Expr>,
     env: Option<String>,
     deserialize_with: Option<syn::Path>,
+    parse_env: Option<syn::Path>,
 }
 
 enum InternalAttr {
@@ -266,6 +269,7 @@ enum InternalAttr {
     Default(Expr),
     Env(String),
     DeserializeWith(syn::Path),
+    ParseEnv(syn::Path),
 }
 
 impl InternalAttr {
@@ -274,6 +278,7 @@ impl InternalAttr {
             Self::Nested => "nested",
             Self::Default(_) => "default",
             Self::Env(_) => "env",
+            Self::ParseEnv(_) => "parse_env",
             Self::DeserializeWith(_) => "deserialize_with",
         }
     }
@@ -308,6 +313,14 @@ impl Parse for InternalAttr {
                 } else {
                     Ok(Self::Env(value))
                 }
+            }
+
+            "parse_env" => {
+                let _: Token![=] = input.parse()?;
+                let path: syn::Path = input.parse()?;
+                assert_empty_or_comma(input)?;
+
+                Ok(Self::ParseEnv(path))
             }
 
             "deserialize_with" => {
