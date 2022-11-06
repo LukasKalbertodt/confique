@@ -4,9 +4,15 @@ All notable changes to this project will be documented in this file.
 
 
 ## [Unreleased]
+
+## [0.2.1] - 2022-11-06
 ### Added
 - `parse_env` attribute for custom parsing of environment variables (allows you
   to load lists and other complex objects from env vars).
+  (in [#22](https://github.com/LukasKalbertodt/confique/pull/22), thanks @cyphersnake)
+
+### Changed
+- Updated `serde_yaml` to 0.9 (this is only an internal dependency).
 
 ## [0.2.0] - 2022-10-21
 ### Added
@@ -65,7 +71,8 @@ All notable changes to this project will be documented in this file.
 - Everything.
 
 
-[Unreleased]: https://github.com/LukasKalbertodt/confique/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/LukasKalbertodt/confique/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/LukasKalbertodt/confique/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/LukasKalbertodt/confique/compare/v0.1.4...v0.2.0
 [0.1.4]: https://github.com/LukasKalbertodt/confique/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/LukasKalbertodt/confique/compare/v0.1.2...v0.1.3
