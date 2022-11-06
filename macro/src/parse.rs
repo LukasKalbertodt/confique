@@ -36,49 +36,34 @@ impl Field {
         let doc = extract_doc(&mut field.attrs);
         let attrs = extract_internal_attrs(&mut field.attrs)?;
 
+        let err = |msg| Err(Error::new(field.ident.span(), msg));
+
         // TODO: check no other attributes are here
         let kind = if attrs.nested {
             if is_option(&field.ty) {
-                return Err(Error::new(
-                    field.ident.span(),
-                    "nested configurations cannot be optional (type `Option<_>`)",
-                ));
+                return err("nested configurations cannot be optional (type `Option<_>`)");
             }
             if attrs.default.is_some() {
-                return Err(Error::new(
-                    field.ident.span(),
-                    "cannot specify `nested` and `default` attributes at the same time",
-                ));
+                return err("cannot specify `nested` and `default` attributes at the same time");
             }
             if attrs.env.is_some() {
-                return Err(Error::new(
-                    field.ident.span(),
-                    "cannot specify `nested` and `env` attributes at the same time",
-                ));
+                return err("cannot specify `nested` and `env` attributes at the same time");
             }
             if attrs.deserialize_with.is_some() {
-                return Err(Error::new(
-                    field.ident.span(),
-                    "cannot specify `nested` and `deserialize_with` attributes at the same time",
-                ));
+                return err("cannot specify `nested` and `deserialize_with` attributes \
+                    at the same time");
             }
 
             FieldKind::Nested { ty: field.ty }
         } else {
             if attrs.env.is_none() && attrs.parse_env.is_some() {
-                return Err(Error::new(
-                    field.ident.span(),
-                    "A `parse_env` attribute, cannot be provided without the `env` attribute",
-                ));
+                return err("cannot specify `parse_env` attribute without the `env` attribute");
             }
 
             let kind = match unwrap_option(&field.ty) {
                 Some(_) if attrs.default.is_some() => {
-                    return Err(Error::new(
-                        field.ident.span(),
-                        "optional fields (type `Option<_>`) cannot have default \
-                            values (`#[config(default = ...)]`)",
-                    ));
+                    return err("optional fields (type `Option<_>`) cannot have default \
+                            values (`#[config(default = ...)]`)");
                 },
                 Some(inner) => LeafKind::Optional { inner_ty: inner.clone() },
                 None => LeafKind::Required { default: attrs.default, ty: field.ty },
