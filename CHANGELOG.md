@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.2.2] - 2022-11-25
+### Fixed
+- Use fully qualified paths for all symbols emitted by the derive macro.
+  Before this, the derive would throw errors if you shadowed any of the symbols
+  `Result`, `Option`, `Ok`, `None` or `Some`. A test has been added to make sure
+  this does not happen again in the future.
+  (Partially in [#23](https://github.com/LukasKalbertodt/confique/pull/23), thanks @aschey)
+
+
 ## [0.2.1] - 2022-11-06
 ### Added
 - `parse_env` attribute for custom parsing of environment variables (allows you
@@ -71,7 +80,8 @@ All notable changes to this project will be documented in this file.
 - Everything.
 
 
-[Unreleased]: https://github.com/LukasKalbertodt/confique/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/LukasKalbertodt/confique/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/LukasKalbertodt/confique/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/LukasKalbertodt/confique/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/LukasKalbertodt/confique/compare/v0.1.4...v0.2.0
 [0.1.4]: https://github.com/LukasKalbertodt/confique/compare/v0.1.3...v0.1.4
