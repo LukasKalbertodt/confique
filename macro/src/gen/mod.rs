@@ -54,7 +54,7 @@ fn gen_config_impl(input: &ir::Input) -> TokenStream {
         impl confique::Config for #name {
             type Partial = #partial_mod_name::#partial_struct_name;
 
-            fn from_partial(partial: Self::Partial) -> Result<Self, confique::Error> {
+            fn from_partial(partial: Self::Partial) -> std::result::Result<Self, confique::Error> {
                 Ok(Self {
                     #( #field_names: #from_exprs, )*
                 })
@@ -208,7 +208,7 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
                 let ty = kind.inner_ty();
 
                 Some(quote! {
-                    fn #fn_name<'de, D>(deserializer: D) -> Result<Option<#ty>, D::Error>
+                    fn #fn_name<'de, D>(deserializer: D) -> std::result::Result<Option<#ty>, D::Error>
                     where
                         D: serde::Deserializer<'de>,
                     {
@@ -251,7 +251,7 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
                     }
                 }
 
-                fn from_env() -> Result<Self, confique::Error> {
+                fn from_env() -> std::result::Result<Self, confique::Error> {
                     Ok(Self {
                         #( #field_names: #from_env_fields, )*
                     })
