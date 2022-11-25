@@ -55,7 +55,7 @@ fn gen_config_impl(input: &ir::Input) -> TokenStream {
             type Partial = #partial_mod_name::#partial_struct_name;
 
             fn from_partial(partial: Self::Partial) -> std::result::Result<Self, confique::Error> {
-                Ok(Self {
+                std::result::Result::Ok(Self {
                     #( #field_names: #from_exprs, )*
                 })
             }
@@ -97,7 +97,9 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
                     }
                 };
 
-                let main = quote_spanned! {name.span()=> #inner_vis #name: Option<#ty> };
+                let main = quote_spanned! {name.span()=>
+                    #inner_vis #name: std::option::Option<#ty>
+                };
                 quote! { #attr #main }
             }
             FieldKind::Nested { ty } => {
@@ -113,7 +115,7 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
 
     let empty_values = input.fields.iter().map(|f| {
         if f.is_leaf() {
-            quote! { None }
+            quote! { std::option::Option::None }
         } else {
             quote! { confique::Partial::empty() }
         }
@@ -135,14 +137,18 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
 
                 match deserialize_with {
                     None => quote! {
-                        Some(confique::internal::deserialize_default(#expr).expect(#msg))
+                        std::option::Option::Some(
+                            confique::internal::deserialize_default(#expr).expect(#msg)
+                        )
                     },
                     Some(p) => quote! {
-                        Some(#p(confique::internal::into_deserializer(#expr)).expect(#msg))
+                        std::option::Option::Some(
+                            #p(confique::internal::into_deserializer(#expr)).expect(#msg)
+                        )
                     },
                 }
             }
-            FieldKind::Leaf { .. } => quote! { None },
+            FieldKind::Leaf { .. } => quote! { std::option::Option::None },
             FieldKind::Nested { .. } => quote! { confique::Partial::default_values() },
         }
     });
@@ -164,7 +170,7 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
                     },
                 }
             }
-            FieldKind::Leaf { .. } => quote! { None },
+            FieldKind::Leaf { .. } => quote! { std::option::Option::None },
             FieldKind::Nested { .. } => quote! { confique::Partial::from_env()? },
         }
     });
@@ -208,11 +214,13 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
                 let ty = kind.inner_ty();
 
                 Some(quote! {
-                    fn #fn_name<'de, D>(deserializer: D) -> std::result::Result<Option<#ty>, D::Error>
+                    fn #fn_name<'de, D>(
+                        deserializer: D,
+                    ) -> std::result::Result<std::option::Option<#ty>, D::Error>
                     where
                         D: serde::Deserializer<'de>,
                     {
-                        #p(deserializer).map(Some)
+                        #p(deserializer).map(std::option::Option::Some)
                     }
                 })
             }
@@ -252,7 +260,7 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
                 }
 
                 fn from_env() -> std::result::Result<Self, confique::Error> {
-                    Ok(Self {
+                    std::result::Result::Ok(Self {
                         #( #field_names: #from_env_fields, )*
                     })
                 }
