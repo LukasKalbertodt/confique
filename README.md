@@ -1,6 +1,6 @@
 # Confique: type-safe, layered configuration library
 
-[<img alt="CI status of main" src="https://img.shields.io/github/workflow/status/LukasKalbertodt/confique/CI/main?label=CI&logo=github&logoColor=white&style=for-the-badge" height="23">](https://github.com/LukasKalbertodt/confique/actions?query=workflow%3ACI+branch%3Amaster)
+[<img alt="CI status of main" src="https://img.shields.io/github/actions/workflow/status/LukasKalbertodt/confique/ci.yaml?branch=main&label=CI&logo=github&logoColor=white&style=for-the-badge" height="23">](https://github.com/LukasKalbertodt/confique/actions/workflows/ci.yaml)
 [<img alt="Crates.io Version" src="https://img.shields.io/crates/v/confique?logo=rust&style=for-the-badge" height="23">](https://crates.io/crates/confique)
 [<img alt="docs.rs" src="https://img.shields.io/crates/v/confique?color=blue&label=docs&style=for-the-badge" height="23">](https://docs.rs/confique)
 
