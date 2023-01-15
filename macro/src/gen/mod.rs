@@ -236,7 +236,18 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
     });
 
     let struct_visibility = inner_visibility(&input.visibility, Span::call_site());
+    let module_doc = format!(
+        "*Generated* by `confique`: helpers to implement `Config` for [`{}`].\n\
+            \n\
+            Do not use directly! Only use via the `Config` and `Partial` traits \
+            and what's explained in the confique documentation.
+            Any other parts of this module cannot be relied on and are not part \
+            of the semver guarantee of `confique`.",
+        input.name,
+    );
+
     quote! {
+        #[doc = #module_doc]
         #visibility mod #mod_name {
             use super::*;
 
