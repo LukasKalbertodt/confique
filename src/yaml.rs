@@ -207,7 +207,8 @@ impl fmt::Display for PrintExpr<'_> {
 
             // All these other types can simply be serialized as is.
             Expr::Str(_) | Expr::Float(_) | Expr::Integer(_) | Expr::Bool(_) => {
-                let out = serde_yaml::to_string(&self.0).expect("string serialization to YAML failed");
+                let out = serde_yaml::to_string(&self.0)
+                    .expect("string serialization to YAML failed");
 
                 // Unfortunately, `serde_yaml` cannot serialize these values on its own
                 // without embedding them in a full document (starting with `---` and

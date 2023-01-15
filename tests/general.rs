@@ -240,7 +240,9 @@ fn full() {
                                 kind: meta::FieldKind::Leaf {
                                     env: Some("ENV_TEST_FULL_2"),
                                     kind: meta::LeafKind::Required {
-                                        default: Some(meta::Expr::Integer(meta::Integer::U16(8080))),
+                                        default: Some(
+                                            meta::Expr::Integer(meta::Integer::U16(8080))
+                                        ),
                                     },
                                 },
                             },
