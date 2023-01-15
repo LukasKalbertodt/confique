@@ -249,6 +249,7 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
     quote! {
         #[doc = #module_doc]
         #visibility mod #mod_name {
+            #![allow(missing_docs)]
             use super::*;
 
             #[derive(confique::serde::Deserialize)]
