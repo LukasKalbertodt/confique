@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.2.3] - 2023-03-10
+### Fixed
+- Add `#[allow(missing_docs)]` to some generated code to avoid problems in
+  crates that `#[forbid(missing_docs)]` globally.
+- Fix badge in README
+
+### Added
+- Add short docs to generated module (to explains its purpose and avoid
+  confusion when people find it in their docs)
+
+### Changed
+- Internal change that potentially improves compile time a tiny bit.
+
 ## [0.2.2] - 2022-11-25
 ### Fixed
 - Use fully qualified paths for all symbols emitted by the derive macro.
@@ -80,7 +93,8 @@ All notable changes to this project will be documented in this file.
 - Everything.
 
 
-[Unreleased]: https://github.com/LukasKalbertodt/confique/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/LukasKalbertodt/confique/compare/v0.2.3...HEAD
+[0.2.3]: https://github.com/LukasKalbertodt/confique/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/LukasKalbertodt/confique/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/LukasKalbertodt/confique/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/LukasKalbertodt/confique/compare/v0.1.4...v0.2.0
