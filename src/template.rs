@@ -6,7 +6,7 @@
 
 use std::fmt;
 
-use crate::{Config, meta::{Meta, FieldKind, LeafKind, Expr}};
+use crate::meta::{Meta, FieldKind, LeafKind, Expr};
 
 
 /// Trait abstracting over the format differences when it comes to formatting a
@@ -146,9 +146,7 @@ impl Default for FormatOptions {
 /// If you don't need to use a custom formatter, rather look at the `format`
 /// functions in the format-specific modules (e.g. `toml::format`,
 /// `yaml::format`).
-pub(crate) fn format<C: Config>(out: &mut impl Formatter, options: FormatOptions) {
-    let meta = &C::META;
-
+pub(crate) fn format(meta: &Meta, out: &mut impl Formatter, options: FormatOptions) {
     // Print root docs.
     if options.comments {
         meta.doc.iter().for_each(|doc| out.comment(doc));

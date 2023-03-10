@@ -93,7 +93,7 @@ impl Default for FormatOptions {
 /// ```
 pub fn template<C: Config>(options: FormatOptions) -> String {
     let mut out = TomlFormatter::new(&options);
-    template::format::<C>(&mut out, options.general);
+    template::format(&C::META, &mut out, options.general);
     out.finish()
 }
 
