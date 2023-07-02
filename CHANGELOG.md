@@ -5,6 +5,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.2.4] - 2023-07-02
+- Fixed enum deserialization from env values
+
 ## [0.2.3] - 2023-03-10
 ### Fixed
 - Add `#[allow(missing_docs)]` to some generated code to avoid problems in
@@ -93,7 +96,8 @@ All notable changes to this project will be documented in this file.
 - Everything.
 
 
-[Unreleased]: https://github.com/LukasKalbertodt/confique/compare/v0.2.3...HEAD
+[Unreleased]: https://github.com/LukasKalbertodt/confique/compare/v0.2.4...HEAD
+[0.2.4]: https://github.com/LukasKalbertodt/confique/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/LukasKalbertodt/confique/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/LukasKalbertodt/confique/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/LukasKalbertodt/confique/compare/v0.2.0...v0.2.1
