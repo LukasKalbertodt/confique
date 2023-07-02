@@ -116,6 +116,18 @@ impl<'de> serde::Deserializer<'de> for Deserializer {
         visitor.visit_newtype_struct(self)
     }
 
+    fn deserialize_enum<V>(
+        self,
+        _name: &str,
+        _variants: &'static [&'static str],
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: serde::de::Visitor<'de>,
+    {
+        visitor.visit_enum(self.value.into_deserializer())
+    }
+
     serde::forward_to_deserialize_any! {
         char str string
         bytes byte_buf
@@ -127,7 +139,6 @@ impl<'de> serde::Deserializer<'de> for Deserializer {
         ignored_any
 
         // TODO: think about manually implementing these
-        enum
         seq
         tuple tuple_struct
     }
