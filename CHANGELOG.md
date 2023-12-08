@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 
 ## [Unreleased]
+- Add `#[config(partial_attr(...))]` struct attribute to specify attributes for
+  the partial type.
 
 ## [0.2.4] - 2023-07-02
 - Fixed enum deserialization from env values

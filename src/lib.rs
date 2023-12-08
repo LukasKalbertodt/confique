@@ -326,6 +326,13 @@ pub use crate::{
 ///     the field.. Can only be present if the `env` attribute is present. Also
 ///     see [`env::parse`].
 ///
+/// There are also the following attributes on the struct itself:
+///
+/// - **`#[config(partial_attr(...))]`: specify attributes that should be
+///     attached to the partial struct definition. For example,
+///     `#[config(partial_attr(derive(Clone)))]` can be used to make the partial
+///     type implement `Clone`.
+///
 /// [serde-deser]: https://serde.rs/field-attrs.html#deserialize_with
 ///
 /// ## Special types for leaf fields

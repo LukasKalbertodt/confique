@@ -1,10 +1,13 @@
 //! Definition of the intermediate representation.
 
+use proc_macro2::TokenStream;
+
 
 /// The parsed input to the `gen_config` macro.
 pub(crate) struct Input {
     pub(crate) doc: Vec<String>,
     pub(crate) visibility: syn::Visibility,
+    pub(crate) partial_attrs: Vec<TokenStream>,
     pub(crate) name: syn::Ident,
     pub(crate) fields: Vec<Field>,
 }

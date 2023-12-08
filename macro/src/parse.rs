@@ -1,3 +1,4 @@
+use proc_macro2::{TokenStream, Group, Delimiter, Ident};
 use syn::{Error, Token, parse::{Parse, ParseStream}, spanned::Spanned, punctuated::Punctuated};
 
 use crate::{
@@ -17,6 +18,7 @@ impl Input {
         };
 
         let doc = extract_doc(&mut input.attrs);
+        let partial_attrs = extract_struct_attrs(input.attrs)?;
         let fields = fields.named.into_iter()
             .map(Field::from_ast)
             .collect::<Result<Vec<_>, _>>()?;
@@ -25,10 +27,52 @@ impl Input {
         Ok(Self {
             doc,
             visibility: input.vis,
+            partial_attrs,
             name: input.ident,
             fields,
         })
     }
+}
+
+fn extract_struct_attrs(attrs: Vec<syn::Attribute>) -> Result<Vec<TokenStream>, Error> {
+    #[derive(Debug)]
+    enum StructAttr {
+        InternalAttr(TokenStream),
+    }
+
+    impl Parse for StructAttr {
+        fn parse(input: ParseStream) -> syn::Result<Self> {
+            let content;
+            syn::parenthesized!(content in input);
+            assert_empty_or_comma(input)?;
+
+            let name: Ident = content.parse()?;
+            match &*name.to_string() {
+                "partial_attr" => {
+                    let g: Group = content.parse()?;
+                    if g.delimiter() != Delimiter::Parenthesis {
+                        return Err(Error::new_spanned(g,
+                            "expected `(...)` but found different delimiter"));
+                    }
+                    assert_empty_or_comma(&content)?;
+                    Ok(Self::InternalAttr(g.stream()))
+                }
+                _ => Err(Error::new_spanned(name, "unknown attribute")),
+            }
+        }
+    }
+
+    let mut partial_attrs = Vec::new();
+    for attr in attrs {
+        if !attr.path.is_ident("config") {
+            continue;
+        }
+        match syn::parse2::<StructAttr>(attr.tokens)? {
+            StructAttr::InternalAttr(tokens) => partial_attrs.push(tokens),
+        }
+    }
+
+    Ok(partial_attrs)
 }
 
 impl Field {

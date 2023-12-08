@@ -246,6 +246,8 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
         input.name,
     );
 
+    let partial_attrs = &input.partial_attrs;
+
     quote! {
         #[doc = #module_doc]
         #visibility mod #mod_name {
@@ -253,6 +255,7 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
             use super::*;
 
             #[derive(confique::serde::Deserialize)]
+            #( #[ #partial_attrs ])*
             #struct_visibility struct #struct_name {
                 #( #struct_fields, )*
             }
