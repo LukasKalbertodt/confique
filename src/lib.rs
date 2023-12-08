@@ -134,7 +134,6 @@
 //! let from_file: PartialConf = File::with_format("/etc/foo/config", FileFormat::Toml)
 //!     .required()
 //!     .load()?;
-//! let from_file: PartialConf = todo!();
 //! let manual = PartialConf {
 //!     // Remember: all fields in the partial types are `Option`s!
 //!     foo: Some(3.14),
