@@ -166,7 +166,7 @@
 //!
 //! - `toml`: enables TOML support and adds the `toml` dependency.
 //! - `yaml`: enables YAML support and adds the `serde_yaml` dependency.
-//! - `json5`: enables YAML support and adds the `json5` dependency.
+//! - `json5`: enables JSON5 support and adds the `json5` dependency.
 
 use serde::Deserialize;
 
