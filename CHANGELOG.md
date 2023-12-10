@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 - Add `#[config(partial_attr(...))]` struct attribute to specify attributes for
   the partial type.
+- Allow "yes" and "no" as values when deserializing `bool` from env. Also, the
+  match is done completely case insensitive now, such that e.g. "True", "tRuE"
+  are accepted now.
 
 ## [0.2.4] - 2023-07-02
 - Fixed enum deserialization from env values

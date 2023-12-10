@@ -85,10 +85,16 @@ impl<'de> serde::Deserializer<'de> for Deserializer {
     where
         V: serde::de::Visitor<'de>,
     {
-        let v = match self.value.trim() {
-            "1" | "true" | "TRUE" => true,
-            "0" | "false" | "FALSE" => false,
-            other => return Err(DeError(format!("invalid value for bool: '{other}'"))),
+        let s = self.value.trim();
+        let v = match () {
+            () if s == "1"
+                || s.eq_ignore_ascii_case("true")
+                || s.eq_ignore_ascii_case("yes") => true,
+
+            () if s == "0"
+                || s.eq_ignore_ascii_case("false")
+                || s.eq_ignore_ascii_case("no") => false,
+            _ => return Err(DeError(format!("invalid value for bool: '{s}'"))),
         };
 
         visitor.visit_bool(v)

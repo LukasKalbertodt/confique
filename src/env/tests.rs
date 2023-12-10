@@ -9,10 +9,19 @@ fn de<'de, T: serde::Deserialize<'de>>(v: &'static str) -> Result<T, DeError> {
 fn boolean() {
     assert_eq!(de("1"), Ok(true));
     assert_eq!(de("true "), Ok(true));
+    assert_eq!(de(" True "), Ok(true));
     assert_eq!(de("  TRUE"), Ok(true));
+    assert_eq!(de("yes"), Ok(true));
+    assert_eq!(de(" Yes"), Ok(true));
+    assert_eq!(de("YES "), Ok(true));
+
     assert_eq!(de("0  "), Ok(false));
     assert_eq!(de(" false"), Ok(false));
+    assert_eq!(de(" False "), Ok(false));
     assert_eq!(de("FALSE "), Ok(false));
+    assert_eq!(de("no"), Ok(false));
+    assert_eq!(de(" No"), Ok(false));
+    assert_eq!(de("NO "), Ok(false));
 }
 
 #[test]
