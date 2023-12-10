@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 
 ## [Unreleased]
+
+## [0.2.5] - 2023-12-10
 - Add `#[config(partial_attr(...))]` struct attribute to specify attributes for
   the partial type.
 - Allow "yes" and "no" as values when deserializing `bool` from env. Also, the
@@ -101,7 +103,8 @@ All notable changes to this project will be documented in this file.
 - Everything.
 
 
-[Unreleased]: https://github.com/LukasKalbertodt/confique/compare/v0.2.4...HEAD
+[Unreleased]: https://github.com/LukasKalbertodt/confique/compare/v0.2.5...HEAD
+[0.2.5]: https://github.com/LukasKalbertodt/confique/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/LukasKalbertodt/confique/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/LukasKalbertodt/confique/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/LukasKalbertodt/confique/compare/v0.2.1...v0.2.2
