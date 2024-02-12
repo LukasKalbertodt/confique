@@ -1,15 +1,13 @@
 //! TOML specific features. This module only exists if the Cargo feature `toml`
 //! is enabled.
 
-use std::fmt::{self, Debug, Write};
+use std::fmt::{self, Display, Write};
 
 use crate::{
     meta::{Expr, MapKey},
     template::{self, Formatter},
     Config,
 };
-
-
 
 /// Options for generating a TOML template.
 #[non_exhaustive]
@@ -187,7 +185,7 @@ impl fmt::Display for PrintExpr<'_> {
                 }
                 f.write_str(" }")?;
                 Ok(())
-            },
+            }
 
             // All these other types can simply be serialized as is.
             Expr::Str(_) | Expr::Float(_) | Expr::Integer(_) | Expr::Bool(_) | Expr::Array(_) => {
@@ -196,23 +194,24 @@ impl fmt::Display for PrintExpr<'_> {
                 //     .fmt(f)
                 let mut string = String::new();
                 serde::Serialize::serialize(&self.0, toml::ser::ValueSerializer::new(&mut string))
-                    .expect("string serialization to TOML failed")
-                    .fmt(f)
+                    .expect("string serialization to TOML failed");
+                string.fmt(f)
             }
         }
     }
 }
 
 fn is_valid_bare_key(s: &str) -> bool {
-    s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+    s.chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
 }
 
 #[cfg(test)]
 mod tests {
     use pretty_assertions::assert_str_eq;
 
-    use crate::test_utils::{self, include_format_output};
     use super::{template, FormatOptions};
+    use crate::test_utils::{self, include_format_output};
 
     #[test]
     fn default() {
