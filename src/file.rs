@@ -77,8 +77,10 @@ impl File {
 
         match self.format {
             #[cfg(feature = "toml")]
-            FileFormat::Toml => toml::from_slice(&file_content)
-                .map_err(|e| error(Box::new(e))),
+            FileFormat::Toml => {
+                let s = std::str::from_utf8(&file_content).map_err(|e| error(Box::new(e)))?;
+                toml::from_str(s).map_err(|e| error(Box::new(e)))
+            }
 
             #[cfg(feature = "yaml")]
             FileFormat::Yaml => serde_yaml::from_slice(&file_content)
