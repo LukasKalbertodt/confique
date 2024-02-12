@@ -1,7 +1,7 @@
 //! TOML specific features. This module only exists if the Cargo feature `toml`
 //! is enabled.
 
-use std::fmt::{self, Write};
+use std::fmt::{self, Debug, Write};
 
 use crate::{
     meta::{Expr, MapKey},
@@ -191,7 +191,11 @@ impl fmt::Display for PrintExpr<'_> {
 
             // All these other types can simply be serialized as is.
             Expr::Str(_) | Expr::Float(_) | Expr::Integer(_) | Expr::Bool(_) | Expr::Array(_) => {
-                toml::to_string(&self.0)
+                // toml::to_string(&self.0)
+                //     .expect("string serialization to TOML failed")
+                //     .fmt(f)
+                let mut string = String::new();
+                serde::Serialize::serialize(&self.0, toml::ser::ValueSerializer::new(&mut string))
                     .expect("string serialization to TOML failed")
                     .fmt(f)
             }

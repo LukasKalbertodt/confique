@@ -2,7 +2,6 @@ use std::{ffi::OsStr, fs, io, path::PathBuf};
 
 use crate::{error::ErrorInner, Error, Partial};
 
-
 /// A file as source for configuration.
 ///
 /// By default, the file is considered optional, meaning that on [`File::load`],
@@ -54,7 +53,10 @@ impl File {
             Ok(v) => v,
             Err(e) if e.kind() == io::ErrorKind::NotFound => {
                 if self.required {
-                    return Err(ErrorInner::MissingRequiredFile { path: self.path.clone() }.into());
+                    return Err(ErrorInner::MissingRequiredFile {
+                        path: self.path.clone(),
+                    }
+                    .into());
                 } else {
                     return Ok(P::empty());
                 }
@@ -63,7 +65,8 @@ impl File {
                 return Err(ErrorInner::Io {
                     path: Some(self.path.clone()),
                     err: e,
-                }.into());
+                }
+                .into());
             }
         };
 
@@ -83,8 +86,9 @@ impl File {
             }
 
             #[cfg(feature = "yaml")]
-            FileFormat::Yaml => serde_yaml::from_slice(&file_content)
-                .map_err(|e| error(Box::new(e))),
+            FileFormat::Yaml => {
+                serde_yaml::from_slice(&file_content).map_err(|e| error(Box::new(e)))
+            }
 
             #[cfg(feature = "json5")]
             FileFormat::Json5 => {
