@@ -1,7 +1,7 @@
 //! TOML specific features. This module only exists if the Cargo feature `toml`
 //! is enabled.
 
-use std::fmt::{self, Display, Write};
+use std::fmt::{self, Write};
 
 use crate::{
     meta::{Expr, MapKey},
