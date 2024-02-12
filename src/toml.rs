@@ -188,7 +188,7 @@ impl fmt::Display for PrintExpr<'_> {
             }
 
             // All these other types can simply be serialized as is.
-            Expr::Str(_) | Expr::Float(_) | Expr::Integer(_) | Expr::Bool(_) | Expr::Array(_) => {
+            Expr::Str(_) | Expr::Integer(_) | Expr::Bool(_) | Expr::Array(_) => {
                 // toml::to_string(&self.0)
                 //     .expect("string serialization to TOML failed")
                 //     .fmt(f)
@@ -196,6 +196,11 @@ impl fmt::Display for PrintExpr<'_> {
                 serde::Serialize::serialize(&self.0, toml::ser::ValueSerializer::new(&mut string))
                     .expect("string serialization to TOML failed");
                 string.fmt(f)
+            }
+
+            Expr::Float(float) => {
+                // Instead of using the toml formatter for the float, we'll use rusts one
+                float.fmt(f)
             }
         }
     }
