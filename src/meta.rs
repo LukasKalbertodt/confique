@@ -140,6 +140,16 @@ impl From<MapKey> for Expr {
     }
 }
 
+impl Float {
+    #[cfg(feature = "toml")]
+    pub(crate) fn is_nan(&self) -> bool {
+        match self {
+            Float::F32(f) => f.is_nan(),
+            Float::F64(f) => f.is_nan(),
+        }
+    }
+}
+
 fn serialize_map<S>(map: &&'static [MapEntry], serializer: S) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,

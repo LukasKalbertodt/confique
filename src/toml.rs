@@ -189,11 +189,20 @@ impl fmt::Display for PrintExpr<'_> {
                 Ok(())
             },
 
+            // We special case floats as the TOML serializer below doesn't work
+            // well with floats, not rounding them appropriately. See:
+            // https://github.com/toml-rs/toml/issues/494
+            //
+            // For all non-NAN floats, the `Display` output is compatible with
+            // TOML.
+            Expr::Float(fv) if !fv.is_nan() => fv.fmt(f),
+
             // All these other types can simply be serialized as is.
             Expr::Str(_) | Expr::Float(_) | Expr::Integer(_) | Expr::Bool(_) | Expr::Array(_) => {
-                toml::to_string(&self.0)
-                    .expect("string serialization to TOML failed")
-                    .fmt(f)
+                let mut s = String::new();
+                serde::Serialize::serialize(&self.0, toml::ser::ValueSerializer::new(&mut s))
+                    .expect("string serialization to TOML failed");
+                s.fmt(f)
             }
         }
     }
