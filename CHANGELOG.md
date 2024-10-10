@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.2.6] - 2024-10-10
+- Fix compile errors when using `confique` derive without having `serde` in your direct dependencies (see [#38](https://github.com/LukasKalbertodt/confique/issues/38)).
+- Update `toml` dependency to 0.8
+- Fix some typos in docs
+
 ## [0.2.5] - 2023-12-10
 - Add `#[config(partial_attr(...))]` struct attribute to specify attributes for
   the partial type.
@@ -103,7 +108,8 @@ All notable changes to this project will be documented in this file.
 - Everything.
 
 
-[Unreleased]: https://github.com/LukasKalbertodt/confique/compare/v0.2.5...HEAD
+[Unreleased]: https://github.com/LukasKalbertodt/confique/compare/v0.2.6...HEAD
+[0.2.6]: https://github.com/LukasKalbertodt/confique/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/LukasKalbertodt/confique/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/LukasKalbertodt/confique/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/LukasKalbertodt/confique/compare/v0.2.2...v0.2.3
