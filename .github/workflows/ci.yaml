@@ -14,14 +14,14 @@ jobs:
     name: Check basic style
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: LukasKalbertodt/check-basic-style@v0.1
 
   check:
     name: 'Build & test'
     runs-on: ubuntu-20.04
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - name: Restore Cache
       uses: Swatinem/rust-cache@v2
     - name: Build
