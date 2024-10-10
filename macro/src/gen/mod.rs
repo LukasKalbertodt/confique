@@ -218,7 +218,7 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
                         deserializer: D,
                     ) -> std::result::Result<std::option::Option<#ty>, D::Error>
                     where
-                        D: serde::Deserializer<'de>,
+                        D: confique::serde::Deserializer<'de>,
                     {
                         #p(deserializer).map(std::option::Option::Some)
                     }
@@ -255,6 +255,7 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
             use super::*;
 
             #[derive(confique::serde::Deserialize)]
+            #[serde(crate = "confique::serde")]
             #( #[ #partial_attrs ])*
             #struct_visibility struct #struct_name {
                 #( #struct_fields, )*
