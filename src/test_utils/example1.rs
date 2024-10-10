@@ -5,6 +5,7 @@ use crate::Config;
 
 #[derive(Debug, Config)]
 /// A sample configuration for our app.
+#[allow(dead_code)]
 pub struct Conf {
     /// Name of the website.
     pub site_name: String,
@@ -20,6 +21,7 @@ pub struct Conf {
 
 /// Configuring the HTTP server of our app.
 #[derive(Debug, Config)]
+#[allow(dead_code)]
 pub struct Http {
     /// The port the server will listen on.
     #[config(env = "PORT")]
@@ -35,6 +37,7 @@ pub struct Http {
 }
 
 #[derive(Debug, Config)]
+#[allow(dead_code)]
 pub struct Headers {
     /// The header in which the reverse proxy specifies the username.
     #[config(default = "x-username")]
@@ -55,6 +58,7 @@ pub struct Headers {
 
 
 #[derive(Debug, Config)]
+#[allow(dead_code)]
 pub struct LogConfig {
     /// If set to `true`, the app will log to stdout.
     #[config(default = true)]
