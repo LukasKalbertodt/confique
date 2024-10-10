@@ -328,7 +328,7 @@ pub use crate::{
 ///
 /// There are also the following attributes on the struct itself:
 ///
-/// - **`#[config(partial_attr(...))]`: specify attributes that should be
+/// - **`#[config(partial_attr(...))]`**: specify attributes that should be
 ///     attached to the partial struct definition. For example,
 ///     `#[config(partial_attr(derive(Clone)))]` can be used to make the partial
 ///     type implement `Clone`.
@@ -339,7 +339,7 @@ pub use crate::{
 ///
 /// These types give a different meaning/semantic to the field. Please note that
 /// due to the limitations of derive macros, the type is checked *literally*.
-/// So it won't work if you rename symbols or used full paths.
+/// So it won't work if you rename symbols or use full paths.
 ///
 /// - **`Option<T>`**: this marks the field as an optional field. All other
 ///   fields are non-optional and will raise an error if while loading the
