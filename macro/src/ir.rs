@@ -86,3 +86,14 @@ pub(crate) enum MapKey {
     Float(syn::LitFloat),
     Bool(syn::LitBool),
 }
+
+impl From<MapKey> for Expr {
+    fn from(src: MapKey) -> Self {
+        match src {
+            MapKey::Str(v) => Self::Str(v),
+            MapKey::Int(v) => Self::Int(v),
+            MapKey::Float(v) => Self::Float(v),
+            MapKey::Bool(v) => Self::Bool(v),
+        }
+    }
+}

@@ -18,7 +18,7 @@ impl Input {
         };
 
         let doc = extract_doc(&mut input.attrs);
-        let partial_attrs = extract_struct_attrs(input.attrs)?;
+        let attrs = StructAttrs::extract(&mut input.attrs)?;
         let fields = fields.named.into_iter()
             .map(Field::from_ast)
             .collect::<Result<Vec<_>, _>>()?;
@@ -27,58 +27,70 @@ impl Input {
         Ok(Self {
             doc,
             visibility: input.vis,
-            partial_attrs,
+            partial_attrs: attrs.partial_attrs,
             name: input.ident,
             fields,
         })
     }
 }
 
-fn extract_struct_attrs(attrs: Vec<syn::Attribute>) -> Result<Vec<TokenStream>, Error> {
-    #[derive(Debug)]
-    enum StructAttr {
-        InternalAttr(TokenStream),
-    }
+// ===== Attributes on the struct =====================================================
 
-    impl Parse for StructAttr {
-        fn parse(input: ParseStream) -> syn::Result<Self> {
-            let content;
-            syn::parenthesized!(content in input);
-            assert_empty_or_comma(input)?;
+#[derive(Default)]
+struct StructAttrs {
+    partial_attrs: Vec<TokenStream>,
+}
 
-            let name: Ident = content.parse()?;
-            match &*name.to_string() {
-                "partial_attr" => {
-                    let g: Group = content.parse()?;
-                    if g.delimiter() != Delimiter::Parenthesis {
-                        return Err(Error::new_spanned(g,
-                            "expected `(...)` but found different delimiter"));
-                    }
-                    assert_empty_or_comma(&content)?;
-                    Ok(Self::InternalAttr(g.stream()))
+#[derive(Debug)]
+enum StructAttr {
+    PartialAttrs(TokenStream),
+}
+
+impl StructAttrs {
+    fn extract(attrs: &mut Vec<syn::Attribute>) -> Result<Self, Error> {
+        let attrs = extract_config_attrs(attrs);
+
+        let mut out = Self::default();
+        for attr in attrs {
+            type AttrList = Punctuated<StructAttr, Token![,]>;
+            let parsed_list = attr.parse_args_with(AttrList::parse_terminated)?;
+
+            for parsed in parsed_list {
+                match parsed {
+                    StructAttr::PartialAttrs(tokens) => out.partial_attrs.push(tokens),
                 }
-                _ => Err(Error::new_spanned(name, "unknown attribute")),
             }
         }
-    }
 
-    let mut partial_attrs = Vec::new();
-    for attr in attrs {
-        if !attr.path.is_ident("config") {
-            continue;
-        }
-        match syn::parse2::<StructAttr>(attr.tokens)? {
-            StructAttr::InternalAttr(tokens) => partial_attrs.push(tokens),
-        }
+        Ok(out)
     }
-
-    Ok(partial_attrs)
 }
+
+impl Parse for StructAttr {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let ident: Ident = input.parse()?;
+        match &*ident.to_string() {
+            "partial_attr" => {
+                let g: Group = input.parse()?;
+                if g.delimiter() != Delimiter::Parenthesis {
+                    return Err(Error::new_spanned(g,
+                        "expected `(...)` but found different delimiter"));
+                }
+                assert_empty_or_comma(&input)?;
+                Ok(Self::PartialAttrs(g.stream()))
+            }
+            _ => Err(syn::Error::new(ident.span(), "unknown confique attribute")),
+        }
+    }
+}
+
+
+// ===== Struct fields =============================================================
 
 impl Field {
     fn from_ast(mut field: syn::Field) -> Result<Self, Error> {
         let doc = extract_doc(&mut field.attrs);
-        let attrs = extract_internal_attrs(&mut field.attrs)?;
+        let attrs = FieldAttrs::extract(&mut field.attrs)?;
 
         let err = |msg| Err(Error::new(field.ident.span(), msg));
 
@@ -133,159 +145,11 @@ impl Field {
     }
 }
 
-impl Parse for Expr {
-    fn parse(input: ParseStream) -> Result<Self, syn::Error> {
-        let msg = "invalid default value. Allowed are only: certain literals \
-            (string, integer, float, bool), and arrays";
 
-        if input.peek(syn::token::Bracket) {
-            // ----- Array -----
-            let content;
-            syn::bracketed!(content in input);
-
-            let items = <Punctuated<Expr, Token![,]>>::parse_terminated(&content)?;
-            Ok(Self::Array(items.into_iter().collect()))
-        } else if input.peek(syn::token::Brace) {
-            // ----- Map -----
-            let content;
-            syn::braced!(content in input);
-
-            let items = <Punctuated<MapEntry, Token![,]>>::parse_terminated(&content)?;
-            Ok(Self::Map(items.into_iter().collect()))
-        } else {
-            // ----- Literal -----
-
-            // We just use `MapKey` here as it's exactly what we want, despite
-            // this not having anything to do with maps.
-            input.parse::<MapKey>()
-                .map_err(|_| Error::new(input.span(), msg))
-                .map(Into::into)
-        }
-    }
-}
-
-
-
-impl Parse for MapEntry {
-    fn parse(input: ParseStream) -> Result<Self, syn::Error> {
-        let key: MapKey = input.parse()?;
-        let _: syn::Token![:] = input.parse()?;
-        let value: Expr = input.parse()?;
-        Ok(Self { key, value })
-    }
-}
-
-impl Parse for MapKey {
-    fn parse(input: ParseStream) -> Result<Self, syn::Error> {
-        let lit: syn::Lit = input.parse()?;
-        match lit {
-            syn::Lit::Str(l) => Ok(Self::Str(l)),
-            syn::Lit::Int(l) => Ok(Self::Int(l)),
-            syn::Lit::Float(l) => Ok(Self::Float(l)),
-            syn::Lit::Bool(l) => Ok(Self::Bool(l)),
-            _ => Err(Error::new(
-                lit.span(),
-                "only string, integer, float, and Boolean literals allowed as map key",
-            )),
-        }
-    }
-}
-
-/// Extracts all doc string attributes from the list and return them as list of
-/// strings (in order).
-fn extract_doc(attrs: &mut Vec<syn::Attribute>) -> Vec<String> {
-    extract_attrs(attrs, |attr| {
-        match attr.parse_meta().ok()? {
-            syn::Meta::NameValue(syn::MetaNameValue {
-                lit: syn::Lit::Str(s),
-                path,
-                ..
-            }) if path.is_ident("doc") => Some(s.value()),
-            _ => None,
-        }
-    })
-}
-
-fn extract_attrs<P, O>(attrs: &mut Vec<syn::Attribute>, mut pred: P) -> Vec<O>
-where
-    P: FnMut(&syn::Attribute) -> Option<O>,
-{
-    // TODO: use `Vec::drain_filter` once stabilized. The current impl is O(n²).
-    let mut i = 0;
-    let mut out = Vec::new();
-    while i < attrs.len() {
-        match pred(&attrs[i]) {
-            Some(v) => {
-                out.push(v);
-                attrs.remove(i);
-            }
-            None => i += 1,
-        }
-    }
-
-    out
-}
-
-fn extract_internal_attrs(
-    attrs: &mut Vec<syn::Attribute>,
-) -> Result<InternalAttrs, Error> {
-    let internal_attrs = extract_attrs(attrs, |attr| {
-        if attr.path.is_ident("config") {
-            // TODO: clone not necessary once we use drain_filter
-            Some(attr.clone())
-        } else {
-            None
-        }
-    });
-
-
-    let mut out = InternalAttrs::default();
-    for attr in internal_attrs {
-        type AttrList = Punctuated<InternalAttr, Token![,]>;
-        let parsed_list = attr.parse_args_with(AttrList::parse_terminated)?;
-
-        for parsed in parsed_list {
-            let keyword = parsed.keyword();
-
-            macro_rules! duplicate_if {
-                ($cond:expr) => {
-                    if $cond {
-                        let msg = format!("duplicate '{keyword}' confique attribute");
-                        return Err(Error::new(attr.tokens.span(), msg));
-                    }
-                };
-            }
-
-            match parsed {
-                InternalAttr::Default(expr) => {
-                    duplicate_if!(out.default.is_some());
-                    out.default = Some(expr);
-                }
-                InternalAttr::Nested => {
-                    duplicate_if!(out.nested);
-                    out.nested = true;
-                }
-                InternalAttr::Env(key) => {
-                    duplicate_if!(out.env.is_some());
-                    out.env = Some(key);
-                }
-                InternalAttr::ParseEnv(path) => {
-                    duplicate_if!(out.parse_env.is_some());
-                    out.parse_env = Some(path);
-                }
-                InternalAttr::DeserializeWith(path) => {
-                    duplicate_if!(out.deserialize_with.is_some());
-                    out.deserialize_with = Some(path);
-                }
-            }
-        }
-    }
-
-    Ok(out)
-}
+// ===== Attributes on fields =====================================================
 
 #[derive(Default)]
-struct InternalAttrs {
+struct FieldAttrs {
     nested: bool,
     default: Option<Expr>,
     env: Option<String>,
@@ -293,7 +157,7 @@ struct InternalAttrs {
     parse_env: Option<syn::Path>,
 }
 
-enum InternalAttr {
+enum FieldAttr {
     Nested,
     Default(Expr),
     Env(String),
@@ -301,7 +165,57 @@ enum InternalAttr {
     ParseEnv(syn::Path),
 }
 
-impl InternalAttr {
+impl FieldAttrs {
+    fn extract(attrs: &mut Vec<syn::Attribute>) -> Result<Self, Error> {
+        let attrs = extract_config_attrs(attrs);
+
+        let mut out = FieldAttrs::default();
+        for attr in attrs {
+            type AttrList = Punctuated<FieldAttr, Token![,]>;
+            let parsed_list = attr.parse_args_with(AttrList::parse_terminated)?;
+
+            for parsed in parsed_list {
+                let keyword = parsed.keyword();
+
+                macro_rules! duplicate_if {
+                    ($cond:expr) => {
+                        if $cond {
+                            let msg = format!("duplicate '{keyword}' confique attribute");
+                            return Err(Error::new(attr.tokens.span(), msg));
+                        }
+                    };
+                }
+
+                match parsed {
+                    FieldAttr::Default(expr) => {
+                        duplicate_if!(out.default.is_some());
+                        out.default = Some(expr);
+                    }
+                    FieldAttr::Nested => {
+                        duplicate_if!(out.nested);
+                        out.nested = true;
+                    }
+                    FieldAttr::Env(key) => {
+                        duplicate_if!(out.env.is_some());
+                        out.env = Some(key);
+                    }
+                    FieldAttr::ParseEnv(path) => {
+                        duplicate_if!(out.parse_env.is_some());
+                        out.parse_env = Some(path);
+                    }
+                    FieldAttr::DeserializeWith(path) => {
+                        duplicate_if!(out.deserialize_with.is_some());
+                        out.deserialize_with = Some(path);
+                    }
+                }
+            }
+        }
+
+        Ok(out)
+    }
+}
+
+impl FieldAttr {
     fn keyword(&self) -> &'static str {
         match self {
             Self::Nested => "nested",
@@ -313,7 +227,7 @@ impl InternalAttr {
     }
 }
 
-impl Parse for InternalAttr {
+impl Parse for FieldAttr {
     fn parse(input: ParseStream) -> Result<Self, syn::Error> {
         let ident: syn::Ident = input.parse()?;
         match &*ident.to_string() {
@@ -365,6 +279,68 @@ impl Parse for InternalAttr {
     }
 }
 
+
+// ===== Expr =====================================================================
+
+impl Parse for Expr {
+    fn parse(input: ParseStream) -> Result<Self, syn::Error> {
+        let msg = "invalid default value. Allowed are only: certain literals \
+            (string, integer, float, bool), and arrays";
+
+        if input.peek(syn::token::Bracket) {
+            // ----- Array -----
+            let content;
+            syn::bracketed!(content in input);
+
+            let items = <Punctuated<Expr, Token![,]>>::parse_terminated(&content)?;
+            Ok(Self::Array(items.into_iter().collect()))
+        } else if input.peek(syn::token::Brace) {
+            // ----- Map -----
+            let content;
+            syn::braced!(content in input);
+
+            let items = <Punctuated<MapEntry, Token![,]>>::parse_terminated(&content)?;
+            Ok(Self::Map(items.into_iter().collect()))
+        } else {
+            // ----- Literal -----
+
+            // We just use `MapKey` here as it's exactly what we want, despite
+            // this not having anything to do with maps.
+            input.parse::<MapKey>()
+                .map_err(|_| Error::new(input.span(), msg))
+                .map(Into::into)
+        }
+    }
+}
+
+impl Parse for MapEntry {
+    fn parse(input: ParseStream) -> Result<Self, syn::Error> {
+        let key: MapKey = input.parse()?;
+        let _: syn::Token![:] = input.parse()?;
+        let value: Expr = input.parse()?;
+        Ok(Self { key, value })
+    }
+}
+
+impl Parse for MapKey {
+    fn parse(input: ParseStream) -> Result<Self, syn::Error> {
+        let lit: syn::Lit = input.parse()?;
+        match lit {
+            syn::Lit::Str(l) => Ok(Self::Str(l)),
+            syn::Lit::Int(l) => Ok(Self::Int(l)),
+            syn::Lit::Float(l) => Ok(Self::Float(l)),
+            syn::Lit::Bool(l) => Ok(Self::Bool(l)),
+            _ => Err(Error::new(
+                lit.span(),
+                "only string, integer, float, and Boolean literals allowed as map key",
+            )),
+        }
+    }
+}
+
+
+// ===== Util =====================================================================
+
 fn assert_empty_or_comma(input: ParseStream) -> Result<(), Error> {
     if input.is_empty() || input.peek(Token![,]) {
         Ok(())
@@ -373,13 +349,49 @@ fn assert_empty_or_comma(input: ParseStream) -> Result<(), Error> {
     }
 }
 
-impl From<MapKey> for Expr {
-    fn from(src: MapKey) -> Self {
-        match src {
-            MapKey::Str(v) => Self::Str(v),
-            MapKey::Int(v) => Self::Int(v),
-            MapKey::Float(v) => Self::Float(v),
-            MapKey::Bool(v) => Self::Bool(v),
+/// Extracts all doc string attributes from the list and returns them as list of
+/// strings (in order).
+fn extract_doc(attrs: &mut Vec<syn::Attribute>) -> Vec<String> {
+    extract_attrs(attrs, |attr| {
+        match attr.parse_meta().ok()? {
+            syn::Meta::NameValue(syn::MetaNameValue {
+                lit: syn::Lit::Str(s),
+                path,
+                ..
+            }) if path.is_ident("doc") => Some(s.value()),
+            _ => None,
+        }
+    })
+}
+
+
+fn extract_config_attrs(attrs: &mut Vec<syn::Attribute>) -> Vec<syn::Attribute> {
+    extract_attrs(attrs, |attr| {
+        if attr.path.is_ident("config") {
+            // TODO: clone not necessary once we use drain_filter
+            Some(attr.clone())
+        } else {
+            None
+        }
+    })
+}
+
+fn extract_attrs<P, O>(attrs: &mut Vec<syn::Attribute>, mut pred: P) -> Vec<O>
+where
+    P: FnMut(&syn::Attribute) -> Option<O>,
+{
+    // TODO: use `Vec::drain_filter` once stabilized. The current impl is O(n²).
+    let mut i = 0;
+    let mut out = Vec::new();
+    while i < attrs.len() {
+        match pred(&attrs[i]) {
+            Some(v) => {
+                out.push(v);
+                attrs.remove(i);
+            }
+            None => i += 1,
         }
     }
+
+    out
 }
