@@ -66,15 +66,18 @@ pub fn from_env_with_parser<T, E: std::error::Error + Send + Sync + 'static>(
     parse: fn(&str) -> Result<T, E>,
 ) -> Result<Option<T>, Error> {
     let v = get_env_var!(key, field);
-    parse(&v)
-        .map(Some)
-        .map_err(|err| {
+    let is_empty = v.is_empty();
+    match parse(&v) {
+        Ok(v) => Ok(Some(v)),
+        Err(_) if is_empty => Ok(None),
+        Err(err) => Err(
             ErrorInner::EnvParseError {
                 field: field.to_owned(),
                 key: key.to_owned(),
                 err: Box::new(err),
             }.into()
-        })
+        ),
+    }
 }
 
 pub fn from_env_with_deserializer<T>(
@@ -83,9 +86,11 @@ pub fn from_env_with_deserializer<T>(
     deserialize: fn(crate::env::Deserializer) -> Result<T, crate::env::DeError>,
 ) -> Result<Option<T>, Error> {
     let s = get_env_var!(key, field);
+    let is_empty = s.is_empty();
 
     match deserialize(crate::env::Deserializer::new(s)) {
         Ok(v) => Ok(Some(v)),
+        Err(_) if is_empty => Ok(None),
         Err(e) => Err(ErrorInner::EnvDeserialization {
             key: key.into(),
             field: field.into(),
