@@ -5,6 +5,14 @@ use std::path::PathBuf;
 
 
 /// Type describing all errors that can occur in this library.
+///
+/// *Note*: the `Display` and `Debug` impls of this type do not include
+///  information about `Error::source` by default. When showing this error to
+///  end users, you should traverse the `source`-chain and print each error.
+///  Crates like `anyhow` and `eyre` do this for you. As a convenience feature,
+///  you can use the "alternate" flag `#` when printing this error to include
+///  the source, e.g. `println!("{:#}", err)`. This will only print the direct
+///  source though, so a proper traversal is still preferred!
 pub struct Error {
     pub(crate) inner: Box<ErrorInner>,
 }
@@ -101,11 +109,21 @@ impl fmt::Display for Error {
             ErrorInner::Io { path: None, .. } => {
                 std::write!(f, "IO error occured while loading configuration")
             }
-            ErrorInner::Deserialization { source: Some(source), .. } => {
-                std::write!(f, "failed to deserialize configuration from {source}")
+            ErrorInner::Deserialization { source: Some(source), err } => {
+                std::write!(f, "failed to deserialize configuration from {source}")?;
+                if f.alternate() {
+                    f.write_str(": ")?;
+                    fmt::Display::fmt(&err, f)?;
+                }
+                Ok(())
             }
-            ErrorInner::Deserialization { source: None, .. } => {
-                std::write!(f, "failed to deserialize configuration")
+            ErrorInner::Deserialization { source: None, err } => {
+                std::write!(f, "failed to deserialize configuration")?;
+                if f.alternate() {
+                    f.write_str(": ")?;
+                    fmt::Display::fmt(&err, f)?;
+                }
+                Ok(())
             }
             ErrorInner::EnvNotUnicode { field, key } => {
                 std::write!(f, "failed to load value `{field}` from \
@@ -117,7 +135,12 @@ impl fmt::Display for Error {
             }
             ErrorInner::EnvParseError { field, key, err } => {
                 std::write!(f, "failed to parse environment variable `{key}` into \
-                    field `{field}`: {err}")
+                    field `{field}`")?;
+                if f.alternate() {
+                    f.write_str(": ")?;
+                    fmt::Display::fmt(&err, f)?;
+                }
+                Ok(())
             }
             ErrorInner::UnsupportedFileFormat { path } => {
                 std::write!(f,

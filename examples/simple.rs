@@ -39,14 +39,15 @@ struct LogConfig {
 }
 
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() {
     let r = Conf::builder()
         .env()
         .file("examples/files/simple.toml")
         .file("examples/files/etc/simple.yaml")
-        .load()?;
+        .load();
 
-    println!("{:#?}", r);
-
-    Ok(())
+    match r {
+        Ok(conf) => println!("{:#?}", conf),
+        Err(e) => println!("{e:#}"),
+    }
 }

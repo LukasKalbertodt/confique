@@ -50,14 +50,12 @@ fn parse_formats(input: &str) -> Result<Vec<Format>, Infallible> {
     Ok(result)
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() {
     std::env::set_var("PATHS", "/bin/ls,/usr/local/bin,/usr/bin/ls");
     std::env::set_var("PORTS", "8080,8888,8000");
     std::env::set_var("NAMES", "Alex|Peter|Mary");
     std::env::set_var("TIMEOUT", "100");
     std::env::set_var("FORMATS", "json5,yaml;.env");
 
-    println!("{:#?}", Conf::builder().env().load()?);
-
-    Ok(())
+    println!("{:#?}", Conf::builder().env().load());
 }
