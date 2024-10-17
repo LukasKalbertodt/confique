@@ -362,10 +362,122 @@ pub use crate::{
 ///
 /// [serde-deser]: https://serde.rs/field-attrs.html#deserialize_with
 ///
+/// #### `validate`
+///
+/// ```ignore
+/// #[config(validate = path::to::function)]
+/// // or
+/// #[config(validate(<expr>, "msg"))]
+/// ```
+///
+/// Adds a validation to the field, i.e. a check that must suceed to be able to
+/// load the configuration. The validator is called as part of the
+/// deserialization, and is thus executed for all layers, not just for the
+/// merged configuration.
+///
+/// > *Note*: remember ["Parse, don't validate"][parse-not-validate]! If you can
+///    reasonably represent your validation logic as a type, you should use
+///    that type instead of validating a weakly-typed field. Example: if your
+///    config value is an IP-address, use the dedicated `std::net::IpAddr` as
+///    field type (can be deserialized from strings) instead of a `String`
+///    field with a `validate` function making sure it's a valid IP-address.
+/// >
+/// > ```ignore
+/// > // GOOD
+/// > addr: std::net::IpAddr,
+/// >
+/// > // BAD
+/// > #[config(validate(addr.parse::<std::net::IpAddr>().is_ok(), "not a valid IP-address"))]
+/// > addr: String,
+/// > ```
+///
+/// [parse-not-validate]: https://lexi-lambda.github.io/blog/2019/11/05/parse-don-t-validate/
+///
+/// The `validate = path::to::function` syntax expects a function that is
+/// callable as `Fn(&T) -> Result<(), E>` where `T` is the (non-optional) type
+/// of the field and `E` can be any type implementing `fmt::Display` (e.g. just
+/// `&str`). Example:
+///
+/// ```
+/// use confique::Config;
+///
+/// #[derive(Config)]
+/// struct Conf {
+///     #[config(validate = is_valid_user)]
+///     user: Option<String>,
+/// }
+///
+/// fn is_valid_user(user: &String) -> Result<(), &'static str> {
+///     if user == "root" {
+///         return Err("user 'root' is not allowed");
+///     }
+///     if !user.is_ascii() {
+///         return Err("user must be an ASCII string");
+///     }
+///     Ok(())
+/// }
+/// # fn main() {}
+/// ```
+///
+/// The `validate(<expr>, "msg")` syntax is only for convenience and intended
+/// for simple cases. It works similar to the `assert!` macro as it expects an
+/// expression validating to `bool` and a string error message. The expression
+/// can access the field value by reference via the field's name. If the
+/// expression validates to `false`, this is treated as a validation error.
+/// Examples:
+///
+/// ```
+/// use confique::Config;
+///
+/// #[derive(Config)]
+/// struct Conf {
+///     #[config(validate(!name.is_empty(), "name must not be empty"))]
+///     name: String,
+///
+///     #[config(validate(*port >= 1024, "cannot use ports < 1024 as non-root user"))]
+///     port: Option<u16>,
+/// }
+/// ```
+///
 ///
 /// ## Struct attributes
 ///
 /// The following attributes can be attached to the struct itself.
+///
+/// #### `validate`
+///
+/// ```ignore
+/// #[config(validate = path::to::function)]
+/// ```
+///
+/// Adds a validation to the config struct, i.e. a check that must suceed to be
+/// able to load the configuration. The validator is called inside
+/// `Config::from_partial`, i.e. only after all layers have been merged.
+///
+/// The given`path::to::function` is expected to be a function callable as
+/// `Fn(&T) -> Result<(), E>` where `T` is the struct type (`Self`) and `E` can
+/// be any type implementing `fmt::Display` (e.g. just `&str`). Example:
+///
+/// ```
+/// use confique::Config;
+///
+/// #[derive(Config)]
+/// #[config(validate = Self::validate)]
+/// struct ColorMixConfig {
+///     source_weight: f32,
+///     target_weight: f32,
+/// }
+///
+/// impl ColorMixConfig {
+///     fn validate(&self) -> Result<(), &'static str> {
+///         if self.source_weight + self.target_weight > 1.0 {
+///             return Err("sum of weights must not exceed 1");
+///         }
+///         Ok(())
+///     }
+/// }
+/// # fn main() {}
+/// ```
 ///
 /// ### `partial_attr`
 ///
@@ -454,10 +566,12 @@ pub trait Config: Sized {
     /// configuration type.
     const META: meta::Meta;
 
-    /// Tries to create `Self` from a potentially partial object.
+    /// Tries to create `Self` from a potentially partial object and validates
+    /// itself.
     ///
-    /// If any required values are not defined in `partial`, an [`Error`] is
-    /// returned.
+    /// An [`Error`] is returned if:
+    /// - any required values are not defined in `partial`, or
+    /// - the struct validation fails (see `validate` attribute on derive macro)
     fn from_partial(partial: Self::Partial) -> Result<Self, Error>;
 
     /// Convenience builder to configure, load and merge multiple configuration
