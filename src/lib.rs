@@ -212,8 +212,8 @@ pub use crate::{
 
 /// Derives (automatically implements) [`Config`] for a struct.
 ///
-/// This only works for structs with named fields, but not for tuple structs,
-/// unit structs, enums, or unions. This macro only works sometimes inside of
+/// This only works for structs with named fields (i.e. not for tuple structs,
+/// unit structs, enums, or unions). This macro only works sometimes inside of
 /// functions (as it generates a module and symbol resolution is weird in that
 /// case); if you get weird errors "symbol not found", just move the struct
 /// definition outside of the function.
@@ -275,66 +275,6 @@ pub use crate::{
 /// stored in [`Meta`][meta::Meta]. They are used in the formatting functions
 /// (e.g. `toml::format`).
 ///
-///
-/// ## Attributes
-///
-/// This macro currently recognizes the following attributes for leaf fields:
-///
-/// - **`#[config(default = ...)]`**: sets a default value for this field. This
-///   is returned by [`Partial::default_values`] and, in most circumstances,
-///   used as a last "layer" to pull values from that have not been set in a
-///   layer of higher-priority. Currently, the following expressions are
-///   allowed:
-///
-///   - Booleans, e.g. `default = true`
-///   - Integers, e.g. `default = 900`
-///   - Floats, e.g. `default = 3.14`
-///   - Strings, e.g. `default = "fox"`
-///   - Arrays, e.g. `default = ["foo", "bar"]`
-///   - Key value maps, e.g. `default = { "cat": 3.14, "bear": 9.0 }`
-///
-///   Map keys can be Booleans, integers, floats, and strings. For array and map
-///   values, you can use any of the expressions in the list above (i.e. you
-///   can nest arrays/maps).
-///
-///   The field value is deserialized from the specified default value
-///   (via `serde::de::IntoDeserializer`). So the expression after `default =`
-///   is often not the same Rust type as your field. For example, you can have
-///   `#[config(default = "/foo/bar")]` on the field `path: PathBuf`. This
-///   works fine as `PathBuf` can be deserialized from a string. (Also see the
-///   `IpAddr` field in the example above.)
-///
-///   If you use an integer or float literal without type suffix, `confique` has
-///   to infer the exact type from the type of the field. This should work in
-///   most cases (`u8`, `f32`, `Vec<i16>`, `[f64; 3]`, ...), but this type
-///   inference is very basic, not even close to what Rust can do. If confique
-///   cannot figure out the type, it defaults to `i32` for integers and `f64`
-///   for floats (like Rust does). If that causes problems for you, just add a
-///   type suffix, e.g. `default = 800u32`.
-///
-/// - **`#[config(env = "KEY")]`**: assigns an environment variable to this
-///   field. In [`Partial::from_env`], the variable is checked and
-///   deserialized into the field if present.
-///
-/// - **`#[config(deserialize_with = path::to::function)]`**: like
-///   [serde's `deserialize_with` attribute][serde-deser].
-///
-/// - **`#[config(parse_env = path::to::function)]`**: function used to parse
-///     environment variables. Mostly useful if you need to parse lists or
-///     other complex objects from env vars. Function needs signature
-///     `fn(&str) -> Result<T, impl std::error::Error>` where `T` is the type of
-///     the field.. Can only be present if the `env` attribute is present. Also
-///     see [`env::parse`].
-///
-/// There are also the following attributes on the struct itself:
-///
-/// - **`#[config(partial_attr(...))]`**: specify attributes that should be
-///     attached to the partial struct definition. For example,
-///     `#[config(partial_attr(derive(Clone)))]` can be used to make the partial
-///     type implement `Clone`.
-///
-/// [serde-deser]: https://serde.rs/field-attrs.html#deserialize_with
-///
 /// ## Special types for leaf fields
 ///
 /// These types give a different meaning/semantic to the field. Please note that
@@ -346,6 +286,93 @@ pub use crate::{
 ///   configuration, no value has been set for them. Optional fields cannot have
 ///   a `#[config(default = ...)]` attribute as that would not make sense.
 ///
+///
+/// ## Field Attributes
+///
+/// The following attributes can be attached to struct fields.
+///
+/// ### `default`
+///
+/// ```ignore
+/// #[config(default = ...)]
+/// ```
+///
+/// Sets a default value for this field. This is returned by
+/// [`Partial::default_values`] and, in most circumstances, used as a
+/// last "layer" to pull values from that have not been set in a layer of
+/// higher-priority. Currently, the following expressions are allowed:
+///
+/// - Booleans, e.g. `default = true`
+/// - Integers, e.g. `default = 900`
+/// - Floats, e.g. `default = 3.14`
+/// - Strings, e.g. `default = "fox"`
+/// - Arrays, e.g. `default = ["foo", "bar"]`
+/// - Key value maps, e.g. `default = { "cat": 3.14, "bear": 9.0 }`
+///
+/// Map keys can be Booleans, integers, floats, and strings. For array and map
+/// values, you can use any of the expressions in the list above (i.e. you
+/// can nest arrays/maps).
+///
+/// The field value is deserialized from the specified default value
+/// (via `serde::de::IntoDeserializer`). So the expression after `default =`
+/// is often not the same Rust type as your field. For example, you can have
+/// `#[config(default = "/foo/bar")]` on the field `path: PathBuf`. This
+/// works fine as `PathBuf` can be deserialized from a string. (Also see the
+/// `IpAddr` field in the example above.)
+///
+/// If you use an integer or float literal without type suffix, `confique` has
+/// to infer the exact type from the type of the field. This should work in
+/// most cases (`u8`, `f32`, `Vec<i16>`, `[f64; 3]`, ...), but this type
+/// inference is very basic, not even close to what Rust can do. If confique
+/// cannot figure out the type, it defaults to `i32` for integers and `f64`
+/// for floats (like Rust does). If that causes problems for you, just add a
+/// type suffix, e.g. `default = 800u32`.
+///
+/// ### `env`
+///
+/// ```ignore
+/// #[config(env = "KEY")]
+/// ```
+///
+/// Assigns an environment variable to this field. In [`Partial::from_env`], the
+/// variable is checked and deserialized into the field if present.
+///
+/// ### `parse_env`
+///
+/// ```ignore
+/// #[config(parse_env = path::to::function)]
+/// ```
+///
+/// Function used to parse environment variables. Mostly useful if you need to
+/// parse lists or other complex objects from env vars. Function needs
+/// signature `fn(&str) -> Result<T, impl std::error::Error>` where `T` is the
+/// type of the field. Can only be present if the `env` attribute is present.
+/// Also see [`env::parse`].
+///
+/// #### `deserialize_with`
+///
+/// ```ignore
+/// #[config(deserialize_with = path::to::function)]
+/// ```
+///
+/// Like [serde's `deserialize_with` attribute][serde-deser].
+///
+/// [serde-deser]: https://serde.rs/field-attrs.html#deserialize_with
+///
+///
+/// ## Struct attributes
+///
+/// The following attributes can be attached to the struct itself.
+///
+/// ### `partial_attr`
+///
+/// ```ignore
+/// #[config(partial_attr(...))]
+/// ```
+///
+/// Specify attributes that should be attached to the partial struct definition.
+/// For example, `#[config(partial_attr(derive(Clone)))]` can be used to make
+/// the partial type implement `Clone`.
 ///
 ///
 /// # What the macro generates
