@@ -2,6 +2,8 @@
 //! intended to be used directly. None of this is covered by semver! Do not use
 //! any of this directly.
 
+use std::fmt::Display;
+
 use crate::{error::ErrorInner, Error};
 
 pub fn deserialize_default<I, O>(src: I) -> Result<O, serde::de::value::Error>
@@ -34,6 +36,13 @@ pub fn map_err_prefix_path<T>(res: Result<T, Error>, prefix: &str) -> Result<T, 
             e
         }
     })
+}
+
+pub fn do_validate_field<T, E>(t: &T, validate: &dyn Fn(&T) -> Result<(), E>) -> Result<(), String>
+where
+    E: Display,
+{
+    validate(t).map_err(|e| format!("validation error: {e}"))
 }
 
 

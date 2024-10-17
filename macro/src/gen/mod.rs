@@ -85,16 +85,15 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
         // messages from the `derive(serde::Deserialize)` have the correct span.
         let inner_vis = inner_visibility(&input.visibility, name.span());
         match &f.kind {
-            FieldKind::Leaf { kind, deserialize_with, .. } => {
+            FieldKind::Leaf { kind, deserialize_with, validate, .. } => {
                 let ty = kind.inner_ty();
-                let attr = match deserialize_with {
-                    None => quote! {},
-                    Some(p) => {
-                        let fn_name = deserialize_fn_name(&f.name).to_string();
-                        quote_spanned! {p.span()=>
-                            #[serde(default, deserialize_with = #fn_name)]
-                        }
+                let attr = if deserialize_with.is_some() || validate.is_some() {
+                    let fn_name = deserialize_fn_name(&f.name).to_string();
+                    quote! {
+                        #[serde(default, deserialize_with = #fn_name)]
                     }
+                } else {
+                    quote! {}
                 };
 
                 let main = quote_spanned! {name.span()=>
@@ -209,9 +208,25 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
 
     let deserialize_fns = input.fields.iter().filter_map(|f| {
         match &f.kind {
-            FieldKind::Leaf { kind, deserialize_with: Some(p), .. } => {
+            FieldKind::Leaf { kind, deserialize_with, validate, .. } => {
                 let fn_name = deserialize_fn_name(&f.name);
                 let ty = kind.inner_ty();
+
+                if deserialize_with.is_none() && validate.is_none() {
+                    return None;
+                }
+
+                let deser_fn = deserialize_with.as_ref()
+                    .map(|f| quote!( #f ))
+                    .unwrap_or_else(|| quote! {
+                        <#ty as confique::serde::Deserialize>::deserialize
+                    });
+                let validate_code = validate.as_ref().map(|f| {
+                    quote_spanned! {f.span() =>
+                        confique::internal::do_validate_field(&out, &#f)
+                            .map_err(<D::Error as confique::serde::de::Error>::custom)?;
+                    }
+                });
 
                 Some(quote! {
                     fn #fn_name<'de, D>(
@@ -220,7 +235,9 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
                     where
                         D: confique::serde::Deserializer<'de>,
                     {
-                        #p(deserializer).map(std::option::Option::Some)
+                        let out = #deser_fn(deserializer)?;
+                        #validate_code
+                        std::result::Result::Ok(std::option::Option::Some(out))
                     }
                 })
             }
