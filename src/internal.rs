@@ -42,7 +42,11 @@ pub fn do_validate_field<T, E>(t: &T, validate: &dyn Fn(&T) -> Result<(), E>) ->
 where
     E: Display,
 {
-    validate(t).map_err(|e| format!("validation error: {e}"))
+    validate(t).map_err(field_validation_err)
+}
+
+pub fn field_validation_err<E: Display>(e: E) -> String {
+    format!("validation error: {e}")
 }
 
 

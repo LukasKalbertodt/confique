@@ -1,9 +1,9 @@
-use proc_macro2::{TokenStream, Group, Delimiter, Ident};
+use proc_macro2::{Delimiter, Group, Ident, TokenStream, TokenTree};
 use syn::{Error, Token, parse::{Parse, ParseStream}, spanned::Spanned, punctuated::Punctuated};
 
 use crate::{
-    ir::{Input, Field, FieldKind, LeafKind, Expr, MapEntry, MapKey},
-    util::{unwrap_option, is_option},
+    ir::{Expr, Field, FieldKind, FieldValidator, Input, LeafKind, MapEntry, MapKey},
+    util::{is_option, unwrap_option},
 };
 
 
@@ -190,7 +190,7 @@ struct FieldAttrs {
     env: Option<String>,
     deserialize_with: Option<syn::Path>,
     parse_env: Option<syn::Path>,
-    validate: Option<syn::Path>,
+    validate: Option<FieldValidator>,
 }
 
 enum FieldAttr {
@@ -199,7 +199,7 @@ enum FieldAttr {
     Env(String),
     DeserializeWith(syn::Path),
     ParseEnv(syn::Path),
-    Validate(syn::Path),
+    Validate(FieldValidator),
 }
 
 impl FieldAttrs {
@@ -295,7 +295,44 @@ impl Parse for FieldAttr {
 
             "parse_env" => parse_eq_value(input).map(Self::ParseEnv),
             "deserialize_with" => parse_eq_value(input).map(Self::DeserializeWith),
-            "validate" => parse_eq_value(input).map(Self::Validate),
+            "validate" => {
+                if input.peek(Token![=]) {
+                    parse_eq_value(input).map(|path| Self::Validate(FieldValidator::Fn(path)))
+                } else if input.peek(syn::token::Paren) {
+                    let g: Group = input.parse()?;
+
+                    // Instead of properly parsing an expression, which would
+                    // require the `full` feature of syn, increasing compile
+                    // time, we just validate the last two/three tokens and
+                    // just assume the tokens before are a valid expression.
+                    let mut tokens = g.stream().into_iter().collect::<Vec<_>>();
+                    if tokens.len() < 3 {
+                        return Err(syn::Error::new(
+                            g.span(),
+                            "expected at least three tokens, found fewer",
+                        ));
+                    }
+
+                    // Ignore trailing comma
+                    if is_comma(tokens.last().unwrap()) {
+                        let _ = tokens.pop();
+                    }
+
+                    let msg = as_string_lit(tokens.pop().unwrap())?;
+                    let sep_comma = tokens.pop().unwrap();
+                    if !is_comma(&sep_comma) {
+                        return Err(syn::Error::new(sep_comma.span(), "expected comma"));
+                    }
+
+                    Ok(Self::Validate(FieldValidator::Simple(tokens.into_iter().collect(), msg)))
+                } else {
+                    Err(syn::Error::new(
+                        ident.span(),
+                        "expected `validate = path::to::fun` or `validate(<expr>, \"error msg\")`, \
+                            but found different token",
+                    ))
+                }
+            }
 
             _ => Err(syn::Error::new(ident.span(), "unknown confique attribute")),
         }
@@ -369,6 +406,21 @@ fn assert_empty_or_comma(input: ParseStream) -> Result<(), Error> {
         Ok(())
     } else {
         Err(Error::new(input.span(), "unexpected tokens, expected no more tokens in this context"))
+    }
+}
+
+fn is_comma(tt: &TokenTree) -> bool {
+    matches!(tt, TokenTree::Punct(p) if p.as_char() == ',')
+}
+
+fn as_string_lit(tt: TokenTree) -> Result<String, syn::Error> {
+    let lit = match tt {
+        TokenTree::Literal(lit) => syn::Lit::new(lit),
+        t => return Err(syn::Error::new(t.span(), "expected string literal")),
+    };
+    match lit {
+        syn::Lit::Str(s) => Ok(s.value()),
+        l => return Err(syn::Error::new(l.span(), "expected string literal")),
     }
 }
 

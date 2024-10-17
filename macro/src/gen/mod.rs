@@ -209,6 +209,7 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
     let deserialize_fns = input.fields.iter().filter_map(|f| {
         match &f.kind {
             FieldKind::Leaf { kind, deserialize_with, validate, .. } => {
+                let field_name = &f.name;
                 let fn_name = deserialize_fn_name(&f.name);
                 let ty = kind.inner_ty();
 
@@ -221,11 +222,23 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
                     .unwrap_or_else(|| quote! {
                         <#ty as confique::serde::Deserialize>::deserialize
                     });
-                let validate_code = validate.as_ref().map(|f| {
-                    quote_spanned! {f.span() =>
-                        confique::internal::do_validate_field(&out, &#f)
+                let validate_code = validate.as_ref().map(|v| match v {
+                    ir::FieldValidator::Fn(path) => quote_spanned! {path.span() =>
+                        confique::internal::do_validate_field(&out, &#path)
                             .map_err(<D::Error as confique::serde::de::Error>::custom)?;
-                    }
+                    },
+                    ir::FieldValidator::Simple(expr, msg) => quote! {
+                        fn is_valid(#field_name: &#ty) -> bool {
+                            #expr
+                        }
+                        if !is_valid(&out) {
+                            return Err(
+                                <D::Error as confique::serde::de::Error>::custom(
+                                    confique::internal::field_validation_err(#msg),
+                                )
+                            )
+                        }
+                    },
                 });
 
                 Some(quote! {

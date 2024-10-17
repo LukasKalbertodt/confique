@@ -29,7 +29,7 @@ pub(crate) enum FieldKind {
         env: Option<String>,
         deserialize_with: Option<syn::Path>,
         parse_env: Option<syn::Path>,
-        validate: Option<syn::Path>,
+        validate: Option<FieldValidator>,
         kind: LeafKind,
     },
 
@@ -37,6 +37,11 @@ pub(crate) enum FieldKind {
     Nested {
         ty: syn::Type,
     },
+}
+
+pub(crate) enum FieldValidator {
+    Fn(syn::Path),
+    Simple(TokenStream, String),
 }
 
 pub(crate) enum LeafKind {
