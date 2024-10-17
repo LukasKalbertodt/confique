@@ -174,10 +174,6 @@ impl Field {
             kind,
         })
     }
-
-    pub(crate) fn is_leaf(&self) -> bool {
-        matches!(self.kind, FieldKind::Leaf { .. })
-    }
 }
 
 
