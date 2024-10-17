@@ -76,6 +76,9 @@ pub(crate) enum ErrorInner {
 
     /// A file source was marked as required but the file does not exist.
     MissingRequiredFile { path: PathBuf },
+
+    /// When a struct validation function fails.
+    Validation { msg: String },
 }
 
 impl std::error::Error for Error {
@@ -90,6 +93,7 @@ impl std::error::Error for Error {
             ErrorInner::UnsupportedFileFormat { .. } => None,
             ErrorInner::MissingFileExtension { .. } => None,
             ErrorInner::MissingRequiredFile { .. } => None,
+            ErrorInner::Validation { .. } => None,
         }
     }
 }
@@ -159,6 +163,9 @@ impl fmt::Display for Error {
                     "required configuration file does not exist: '{}'",
                     path.display(),
                 )
+            }
+            ErrorInner::Validation { msg } => {
+                std::write!(f, "config validation failed: {msg}")
             }
         }
     }

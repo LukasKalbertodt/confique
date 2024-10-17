@@ -49,6 +49,12 @@ pub fn field_validation_err<E: Display>(e: E) -> String {
     format!("validation error: {e}")
 }
 
+pub fn do_validate_struct<T, E>(t: &T, validate: &dyn Fn(&T) -> Result<(), E>) -> Result<(), Error>
+where
+    E: Display,
+{
+    validate(t).map_err(|msg| ErrorInner::Validation { msg: msg.to_string() }.into())
+}
 
 macro_rules! get_env_var {
     ($key:expr, $field:expr) => {

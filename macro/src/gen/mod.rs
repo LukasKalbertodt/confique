@@ -47,6 +47,9 @@ fn gen_config_impl(input: &ir::Input) -> TokenStream {
         }
     });
 
+    let validation = input.validate.as_ref().map(|v| quote! {
+        confique::internal::do_validate_struct(&out, &#v)?;
+    });
 
     let meta_item = meta::gen(input);
     quote! {
@@ -55,9 +58,11 @@ fn gen_config_impl(input: &ir::Input) -> TokenStream {
             type Partial = #partial_mod_name::#partial_struct_name;
 
             fn from_partial(partial: Self::Partial) -> std::result::Result<Self, confique::Error> {
-                std::result::Result::Ok(Self {
+                let out = Self {
                     #( #field_names: #from_exprs, )*
-                })
+                };
+                #validation
+                std::result::Result::Ok(out)
             }
 
             #meta_item
