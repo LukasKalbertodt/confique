@@ -47,8 +47,11 @@ fn gen_config_impl(input: &ir::Input) -> TokenStream {
         }
     });
 
-    let validation = input.validate.as_ref().map(|v| quote! {
-        confique::internal::do_validate_struct(&out, &#v)?;
+    let validation = input.validate.as_ref().map(|v| {
+        let struct_name = name.to_string();
+        quote! {
+            confique::internal::validate_struct(&out, &#v, #struct_name)?;
+        }
     });
 
     let meta_item = meta::gen(input);
@@ -212,60 +215,98 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
             let inner_ty = kind.inner_ty();
 
             // This has an ugly name to avoid clashing with imported names.
-            let deserialize_fn_name = quote::format_ident!("__confique_deserialize_{field_name}");
+            let validate_fn_name = quote::format_ident!("__confique_validate_{field_name}");
+            let deserialize_fn_name
+                = quote::format_ident!("__confique_deserialize_direct_{field_name}");
 
-            // We sometimes have to create extra helper functions, either to pass to
-            // `serde(deserialize_with)` or to save on code duplication. We cannot just
-            // pass the deserialize function given to confique to serde, as confique
-            // accepts a function deserializing the inner type `T`, where serde expects
-            // `Option<T>`. Also, validation should be part of the serialization, so we
-            // need to create a custom function in that case too.
-            if deserialize_with.is_some() || validate.is_some() {
-                let deser_fn = deserialize_with.as_ref()
-                    .map(|f| quote!( #f ))
-                    .unwrap_or_else(|| quote! {
-                        <#inner_ty as confique::serde::Deserialize>::deserialize
-                    });
+            let default_deserialize_path = quote! {
+                <#inner_ty as confique::serde::Deserialize>::deserialize
+            };
 
-                let validate_code = validate.as_ref().map(|v| match v {
-                    ir::FieldValidator::Fn(path) => quote_spanned! {path.span() =>
-                        confique::internal::do_validate_field(&out, &#path)
-                            .map_err(<D::Error as confique::serde::de::Error>::custom)?;
+            // We sometimes emit extra helper functions to avoid code duplication.
+            // Validation should be part of the serialization. `validation_fn` is
+            // `Some(Ident)` if there is a validator function. `deserialize_fn` is
+            // a token stream that represents a callable function that deserializes
+            // `inner_ty`.
+            let (validate_fn, deserialize_fn) = if let Some(validator) = &validate {
+                let validate_inner = match validator {
+                    ir::FieldValidator::Fn(f) => quote_spanned! {f.span() =>
+                        confique::internal::validate_field(v, &#f)
                     },
                     ir::FieldValidator::Simple(expr, msg) => quote! {
                         fn is_valid(#field_name: &#inner_ty) -> bool {
                             #expr
                         }
-                        if !is_valid(&out) {
-                            return Err(
-                                <D::Error as confique::serde::de::Error>::custom(
-                                    confique::internal::field_validation_err(#msg),
-                                )
-                            )
-                        }
+                        confique::internal::validate_field(v, &|v| {
+                            if !is_valid(v) {
+                                Err(#msg)
+                            } else {
+                                Ok(())
+                            }
+                        })
                     },
-                });
+                };
+
+                let deser_fn = deserialize_with.as_ref()
+                    .map(|f| quote!( #f ))
+                    .unwrap_or_else(|| default_deserialize_path.clone());
 
                 parts.extra_items.extend(quote! {
+                    #[inline(never)]
+                    fn #validate_fn_name(
+                        v: &#inner_ty,
+                    ) -> std::result::Result<(), confique::Error> {
+                        #validate_inner
+                    }
+
                     fn #deserialize_fn_name<'de, D>(
                         deserializer: D,
-                    ) -> std::result::Result<std::option::Option<#inner_ty>, D::Error>
+                    ) -> std::result::Result<#inner_ty, D::Error>
                     where
                         D: confique::serde::Deserializer<'de>,
                     {
                         let out = #deser_fn(deserializer)?;
-                        #validate_code
-                        std::result::Result::Ok(std::option::Option::Some(out))
+                        #validate_fn_name(&out)
+                            .map_err(<D::Error as confique::serde::de::Error>::custom)?;
+                        std::result::Result::Ok(out)
                     }
                 });
-            }
+
+                (Some(validate_fn_name), quote! { #deserialize_fn_name })
+            } else {
+                // If there is no validation, we will not create a custom
+                // deserialization function for this, so we either use `T::deserialize`
+                // or, if set, the specified deserialization function.
+                let deser = deserialize_with.as_ref()
+                    .map(|f| quote! { #f })
+                    .unwrap_or(default_deserialize_path);
+                (None, deser)
+            };
+
 
             // Struct field definition
             parts.struct_fields.push({
-                let deserialize_fn_name = deserialize_fn_name.to_string();
+                // If there is a custom deserializer or a validator, we need to
+                // set the serde `deserialize_with` attribute.
                 let attr = if deserialize_with.is_some() || validate.is_some() {
+                    // Since the struct field is `Option<T>`, we need to create
+                    // another wrapper deserialization function, that always
+                    // returns `Some`.
+                    let fn_name = quote::format_ident!("__confique_deserialize_some_{field_name}");
+                    parts.extra_items.extend(quote! {
+                        fn #fn_name<'de, D>(
+                            deserializer: D,
+                        ) -> std::result::Result<std::option::Option<#inner_ty>, D::Error>
+                        where
+                            D: confique::serde::Deserializer<'de>,
+                        {
+                            #deserialize_fn(deserializer).map(std::option::Option::Some)
+                        }
+                    });
+
+                    let attr_value = fn_name.to_string();
                     quote! {
-                        #[serde(default, deserialize_with = #deserialize_fn_name)]
+                        #[serde(default, deserialize_with = #attr_value)]
                     }
                 } else {
                     quote! {}
@@ -292,37 +333,32 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
                     let msg = format!("default config value for `{qualified_name}` \
                         cannot be deserialized");
                     let expr = default_value_to_deserializable_expr(&default);
-
-                    let inner = match deserialize_with {
-                        None => quote! { confique::internal::deserialize_default(#expr) },
-                        Some(p) => quote! { #p(confique::internal::into_deserializer(#expr)) },
-                    };
-
                     quote! {
-                        std::option::Option::Some(#inner.expect(#msg))
+                        std::option::Option::Some(
+                            #deserialize_fn(confique::internal::into_deserializer(#expr))
+                                .expect(#msg)
+                        )
                     }
                 }
                 _ => quote! { std::option::Option::None },
             });
 
             // Code for `Partial::from_env()`
-            parts.from_env_exprs.push(match env {
-                None => quote! { std::option::Option::None },
-                Some(key) => {
-                    match (parse_env, deserialize_with) {
-                        (None, None) => quote! {
-                            confique::internal::from_env(#key, #qualified_name)?
-                        },
-                        (None, Some(deserialize_with)) => quote! {
-                            confique::internal::from_env_with_deserializer(
-                                #key, #qualified_name, #deserialize_with)?
-                        },
-                        (Some(parse_env), _) => quote! {
-                            confique::internal::from_env_with_parser(
-                                #key, #qualified_name, #parse_env)?
-                        },
-                    }
+            parts.from_env_exprs.push(match (env, parse_env) {
+                (None, _) => quote! { std::option::Option::None },
+                (Some(key), None) => quote! {
+                    confique::internal::from_env(#key, #qualified_name, #deserialize_fn)?
                 },
+                (Some(key), Some(parse_env)) => {
+                    let validator = match &validate_fn {
+                        Some(f) => quote! { #f },
+                        None => quote! { |_| std::result::Result::<(), String>::Ok(()) },
+                    };
+                    quote! {
+                        confique::internal::from_env_with_parser(
+                            #key, #qualified_name, #parse_env, #validator)?
+                    }
+                }
             });
         }
     }

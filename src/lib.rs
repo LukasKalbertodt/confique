@@ -338,7 +338,7 @@ pub use crate::{
 /// variable is checked and deserialized into the field if present.
 ///
 /// If the env var is set to an empty string and if the field fails to
-/// parse/deserialize from it, it is treated as unset.
+/// parse/deserialize/validate, it is treated as unset.
 ///
 /// ### `parse_env`
 ///
