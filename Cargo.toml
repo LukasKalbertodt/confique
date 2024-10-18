@@ -34,7 +34,7 @@ required-features = ["toml"]
 
 
 [features]
-default = ["toml", "yaml", "json5"]
+default = []
 yaml = ["serde_yaml"]
 
 
@@ -47,3 +47,7 @@ toml = { version = "0.8", optional = true }
 
 [dev-dependencies]
 pretty_assertions = "1.2.1"
+
+
+[package.metadata.docs.rs]
+all-features = true

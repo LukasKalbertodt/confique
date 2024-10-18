@@ -8,6 +8,10 @@
 //!
 //! # How to use
 //!
+//! Add `confique` as dependency to your `Cargo.toml` and remember to enable the
+//! crate features for file formats you are interested in. For example:
+//! `cargo add confique --features=toml`.
+//!
 //! ## Defining your configuration with structs
 //!
 //! First, define some structs that describe all your configuration values. Use
@@ -154,12 +158,12 @@
 //!
 //! # Cargo features
 //!
-//! This crate has a Cargo feature for each supported file format which are all
-//! enabled by default to get started easily. If you don't need certain
-//! features, remember to disable them to save compile time:
+//! This crate has a Cargo feature for each supported file format. These are not
+//! enabled by default, so you have to specify which file formats you are
+//! interested in.
 //!
 //! ```toml
-//! confique = { version = "...", default-features = false, features = ["toml"] }
+//! confique = { version = "...", features = ["toml"] }
 //! ```
 //!
 //! All crate features:

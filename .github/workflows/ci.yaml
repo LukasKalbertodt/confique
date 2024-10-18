@@ -26,7 +26,7 @@ jobs:
       uses: Swatinem/rust-cache@v2
     - name: Build
       run: cargo build
+    - name: Run tests with file formats
+      run: cargo test --features=toml,yaml,json5
     - name: Run tests
-      run: |
-        cargo test
-        cargo test --no-default-features
+      run: cargo test
