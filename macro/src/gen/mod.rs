@@ -419,7 +419,10 @@ fn default_value_to_deserializable_expr(expr: &ir::Expr) -> TokenStream {
 fn inner_visibility(outer: &syn::Visibility, span: Span) -> TokenStream {
     match outer {
         // These visibilities can be used as they are. No adjustment needed.
-        syn::Visibility::Public(_) | syn::Visibility::Crate(_) => quote_spanned! {span=> #outer },
+        syn::Visibility::Public(_) => quote_spanned! {span=> #outer },
+        syn::Visibility::Restricted(r) if r.path.is_ident("crate") && r.in_token.is_none() => {
+            quote_spanned! {span=> #outer }
+        },
 
         // The inherited one is relative to the parent module.
         syn::Visibility::Inherited => quote_spanned! {span=> pub(super) },

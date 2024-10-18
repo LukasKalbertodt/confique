@@ -64,7 +64,7 @@ impl StructAttrs {
                     ($cond:expr) => {
                         if $cond {
                             let msg = format!("duplicate '{keyword}' confique attribute");
-                            return Err(Error::new(attr.tokens.span(), msg));
+                            return Err(Error::new(attr.path().span(), msg));
                         }
                     };
                 }
@@ -214,7 +214,7 @@ impl FieldAttrs {
                     ($cond:expr) => {
                         if $cond {
                             let msg = format!("duplicate '{keyword}' confique attribute");
-                            return Err(Error::new(attr.tokens.span(), msg));
+                            return Err(Error::new(attr.path().span(), msg));
                         }
                     };
                 }
@@ -433,9 +433,9 @@ fn parse_eq_value<T: syn::parse::Parse>(input: ParseStream) -> Result<T, Error> 
 /// strings (in order).
 fn extract_doc(attrs: &mut Vec<syn::Attribute>) -> Vec<String> {
     extract_attrs(attrs, |attr| {
-        match attr.parse_meta().ok()? {
+        match &attr.meta {
             syn::Meta::NameValue(syn::MetaNameValue {
-                lit: syn::Lit::Str(s),
+                value: syn::Expr::Lit(syn::ExprLit { lit: syn::Lit::Str(s), .. }),
                 path,
                 ..
             }) if path.is_ident("doc") => Some(s.value()),
@@ -447,7 +447,7 @@ fn extract_doc(attrs: &mut Vec<syn::Attribute>) -> Vec<String> {
 
 fn extract_config_attrs(attrs: &mut Vec<syn::Attribute>) -> Vec<syn::Attribute> {
     extract_attrs(attrs, |attr| {
-        if attr.path.is_ident("config") {
+        if attr.path().is_ident("config") {
             // TODO: clone not necessary once we use drain_filter
             Some(attr.clone())
         } else {
