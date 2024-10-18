@@ -28,6 +28,10 @@ name = "indirect-serde"
 path = "tests/indirect-serde/run.rs"
 harness = false
 
+[[test]]
+name = "validation"
+required-features = ["toml"]
+
 
 [features]
 default = ["toml", "yaml", "json5"]
