@@ -19,10 +19,18 @@ exclude = [".github"]
 name = "simple"
 required-features = ["toml"]
 
+[[example]]
+name = "validate"
+required-features = ["toml"]
+
 [[test]]
 name = "indirect-serde"
 path = "tests/indirect-serde/run.rs"
 harness = false
+
+[[test]]
+name = "validation"
+required-features = ["toml"]
 
 
 [features]

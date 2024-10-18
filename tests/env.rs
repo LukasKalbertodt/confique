@@ -23,6 +23,14 @@ fn my_parser(s: &str) -> Result<u32, impl std::error::Error> {
     s.trim().parse()
 }
 
+fn my_parser2(s: &str) -> Result<u32, impl std::error::Error> {
+    if s.is_empty() {
+        Ok(0)
+    } else {
+        s.trim().parse()
+    }
+}
+
 #[test]
 fn empty_error_is_unset() {
     #[derive(Config)]
@@ -37,6 +45,16 @@ fn empty_error_is_unset() {
 
         #[config(env = "EMPTY_ERROR_IS_UNSET_BAZ")]
         baz: String,
+
+        #[config(env = "EMPTY_ERROR_IS_UNSET_VALIDATE", validate(!validate.is_empty(), "bad"))]
+        validate: String,
+
+        #[config(
+            env = "EMPTY_ERROR_IS_UNSET_VALIDATE_PARSE",
+            parse_env = my_parser2,
+            validate(*validate_parse != 0, "bad"),
+        )]
+        validate_parse: u32,
     }
 
     type Partial = <Conf as Config>::Partial;
@@ -46,6 +64,8 @@ fn empty_error_is_unset() {
         foo: None,
         bar: None,
         baz: None,
+        validate: None,
+        validate_parse: None,
     });
 
     std::env::set_var("EMPTY_ERROR_IS_UNSET_BAR", "");
@@ -53,6 +73,8 @@ fn empty_error_is_unset() {
         foo: None,
         bar: None,
         baz: None,
+        validate: None,
+        validate_parse: None,
     });
 
     std::env::set_var("EMPTY_ERROR_IS_UNSET_BAZ", "");
@@ -60,5 +82,25 @@ fn empty_error_is_unset() {
         foo: None,
         bar: None,
         baz: Some("".into()),
+        validate: None,
+        validate_parse: None,
+    });
+
+    std::env::set_var("EMPTY_ERROR_IS_UNSET_VALIDATE", "");
+    assert_eq!(Partial::from_env().unwrap(), Partial {
+        foo: None,
+        bar: None,
+        baz: Some("".into()),
+        validate: None,
+        validate_parse: None,
+    });
+
+    std::env::set_var("EMPTY_ERROR_IS_UNSET_VALIDATE_PARSE", "");
+    assert_eq!(Partial::from_env().unwrap(), Partial {
+        foo: None,
+        bar: None,
+        baz: Some("".into()),
+        validate: None,
+        validate_parse: None,
     });
 }

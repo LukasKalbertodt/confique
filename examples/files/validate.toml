@@ -1,0 +1,6 @@
+name = "peter"
+port = 1234
+
+[watch]
+busy_poll = true
+poll_period = 300

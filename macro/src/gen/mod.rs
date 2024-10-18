@@ -47,6 +47,12 @@ fn gen_config_impl(input: &ir::Input) -> TokenStream {
         }
     });
 
+    let validation = input.validate.as_ref().map(|v| {
+        let struct_name = name.to_string();
+        quote! {
+            confique::internal::validate_struct(&out, &#v, #struct_name)?;
+        }
+    });
 
     let meta_item = meta::gen(input);
     quote! {
@@ -55,9 +61,11 @@ fn gen_config_impl(input: &ir::Input) -> TokenStream {
             type Partial = #partial_mod_name::#partial_struct_name;
 
             fn from_partial(partial: Self::Partial) -> std::result::Result<Self, confique::Error> {
-                std::result::Result::Ok(Self {
+                let out = Self {
                     #( #field_names: #from_exprs, )*
-                })
+                };
+                #validation
+                std::result::Result::Ok(out)
             }
 
             #meta_item
@@ -68,173 +76,29 @@ fn gen_config_impl(input: &ir::Input) -> TokenStream {
 /// Generates the whole `mod ... { ... }` that defines the partial type and
 /// related items.
 fn gen_partial_mod(input: &ir::Input) -> TokenStream {
+    // Iterate through all fields, collecting field-relevant parts to be sliced
+    // in the various methods.
+    let mut parts = Parts::default();
+    for f in &input.fields {
+        gen_parts_for_field(f, input, &mut parts);
+    }
+    let Parts {
+        field_names,
+        struct_fields,
+        nested_bounds,
+        empty_exprs,
+        default_exprs,
+        from_env_exprs,
+        fallback_exprs,
+        is_empty_exprs,
+        is_complete_exprs,
+        extra_items,
+    } = parts;
+
+    // Prepare some values for interpolation
     let (mod_name, struct_name) = partial_names(&input.name);
     let visibility = &input.visibility;
-
-    fn deserialize_fn_name(field_name: &Ident) -> Ident {
-        // This has an ugly name to avoid clashing with imported names.
-        quote::format_ident!("__confique_deserialize_{field_name}")
-    }
-
-    // Prepare some tokens per field.
-    let field_names = input.fields.iter().map(|f| &f.name).collect::<Vec<_>>();
-    let struct_fields = input.fields.iter().map(|f| {
-        let name = &f.name;
-
-        // We have to use the span of the field's name here so that error
-        // messages from the `derive(serde::Deserialize)` have the correct span.
-        let inner_vis = inner_visibility(&input.visibility, name.span());
-        match &f.kind {
-            FieldKind::Leaf { kind, deserialize_with, .. } => {
-                let ty = kind.inner_ty();
-                let attr = match deserialize_with {
-                    None => quote! {},
-                    Some(p) => {
-                        let fn_name = deserialize_fn_name(&f.name).to_string();
-                        quote_spanned! {p.span()=>
-                            #[serde(default, deserialize_with = #fn_name)]
-                        }
-                    }
-                };
-
-                let main = quote_spanned! {name.span()=>
-                    #inner_vis #name: std::option::Option<#ty>
-                };
-                quote! { #attr #main }
-            }
-            FieldKind::Nested { ty } => {
-                let ty_span = ty.span();
-                let field_ty = quote_spanned! {ty_span=> <#ty as confique::Config>::Partial };
-                quote! {
-                    #[serde(default = "confique::Partial::empty")]
-                    #inner_vis #name: #field_ty
-                }
-            },
-        }
-    });
-
-    let empty_values = input.fields.iter().map(|f| {
-        if f.is_leaf() {
-            quote! { std::option::Option::None }
-        } else {
-            quote! { confique::Partial::empty() }
-        }
-    });
-
-    let defaults = input.fields.iter().map(|f| {
-        match &f.kind {
-            FieldKind::Leaf {
-                kind: LeafKind::Required { default: Some(default), .. },
-                deserialize_with,
-                ..
-            } => {
-                let msg = format!(
-                    "default config value for `{}::{}` cannot be deserialized",
-                    input.name,
-                    f.name,
-                );
-                let expr = default_value_to_deserializable_expr(&default);
-
-                match deserialize_with {
-                    None => quote! {
-                        std::option::Option::Some(
-                            confique::internal::deserialize_default(#expr).expect(#msg)
-                        )
-                    },
-                    Some(p) => quote! {
-                        std::option::Option::Some(
-                            #p(confique::internal::into_deserializer(#expr)).expect(#msg)
-                        )
-                    },
-                }
-            }
-            FieldKind::Leaf { .. } => quote! { std::option::Option::None },
-            FieldKind::Nested { .. } => quote! { confique::Partial::default_values() },
-        }
-    });
-
-    let from_env_fields = input.fields.iter().map(|f| {
-        match &f.kind {
-            FieldKind::Leaf { env: Some(key), deserialize_with, parse_env, .. } => {
-                let field = format!("{}::{}", input.name, f.name);
-                match (parse_env, deserialize_with) {
-                    (None, None) => quote! {
-                        confique::internal::from_env(#key, #field)?
-                    },
-                    (None, Some(deserialize_with)) => quote! {
-                        confique::internal::from_env_with_deserializer(
-                            #key, #field, #deserialize_with)?
-                    },
-                    (Some(parse_env), _) => quote! {
-                        confique::internal::from_env_with_parser(#key, #field, #parse_env)?
-                    },
-                }
-            }
-            FieldKind::Leaf { .. } => quote! { std::option::Option::None },
-            FieldKind::Nested { .. } => quote! { confique::Partial::from_env()? },
-        }
-    });
-
-    let fallbacks = input.fields.iter().map(|f| {
-        let name = &f.name;
-        if f.is_leaf() {
-            quote! { self.#name.or(fallback.#name) }
-        } else {
-            quote! { self.#name.with_fallback(fallback.#name) }
-        }
-    });
-
-    let is_empty_exprs = input.fields.iter().map(|f| {
-        let name = &f.name;
-        if f.is_leaf() {
-            quote! { self.#name.is_none() }
-        } else {
-            quote! { self.#name.is_empty() }
-        }
-    });
-
-    let is_complete_expr = input.fields.iter().map(|f| {
-        let name = &f.name;
-        match &f.kind {
-            FieldKind::Leaf { kind, .. } => {
-                if kind.is_required() {
-                    quote! { self.#name.is_some() }
-                } else {
-                    quote! { true }
-                }
-            }
-            FieldKind::Nested { .. } => quote! { self.#name.is_complete() },
-        }
-    });
-
-    let deserialize_fns = input.fields.iter().filter_map(|f| {
-        match &f.kind {
-            FieldKind::Leaf { kind, deserialize_with: Some(p), .. } => {
-                let fn_name = deserialize_fn_name(&f.name);
-                let ty = kind.inner_ty();
-
-                Some(quote! {
-                    fn #fn_name<'de, D>(
-                        deserializer: D,
-                    ) -> std::result::Result<std::option::Option<#ty>, D::Error>
-                    where
-                        D: confique::serde::Deserializer<'de>,
-                    {
-                        #p(deserializer).map(std::option::Option::Some)
-                    }
-                })
-            }
-            _ => None,
-        }
-    });
-
-    let nested_bounds = input.fields.iter().filter_map(|f| {
-        match &f.kind {
-            FieldKind::Nested { ty } => Some(quote! { #ty: confique::Config }),
-            FieldKind::Leaf { .. } => None,
-        }
-    });
-
+    let partial_attrs = &input.partial_attrs;
     let struct_visibility = inner_visibility(&input.visibility, Span::call_site());
     let module_doc = format!(
         "*Generated* by `confique`: helpers to implement `Config` for [`{}`].\n\
@@ -246,8 +110,6 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
         input.name,
     );
 
-    let partial_attrs = &input.partial_attrs;
-
     quote! {
         #[doc = #module_doc]
         #visibility mod #mod_name {
@@ -258,32 +120,32 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
             #[serde(crate = "confique::serde")]
             #( #[ #partial_attrs ])*
             #struct_visibility struct #struct_name {
-                #( #struct_fields, )*
+                #( #struct_fields )*
             }
 
             #[automatically_derived]
             impl confique::Partial for #struct_name where #( #nested_bounds, )* {
                 fn empty() -> Self {
                     Self {
-                        #( #field_names: #empty_values, )*
+                        #( #field_names: #empty_exprs, )*
                     }
                 }
 
                 fn default_values() -> Self {
                     Self {
-                        #( #field_names: #defaults, )*
+                        #( #field_names: #default_exprs, )*
                     }
                 }
 
                 fn from_env() -> std::result::Result<Self, confique::Error> {
                     std::result::Result::Ok(Self {
-                        #( #field_names: #from_env_fields, )*
+                        #( #field_names: #from_env_exprs, )*
                     })
                 }
 
                 fn with_fallback(self, fallback: Self) -> Self {
                     Self {
-                        #( #field_names: #fallbacks, )*
+                        #( #field_names: #fallback_exprs, )*
                     }
                 }
 
@@ -292,11 +154,212 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
                 }
 
                 fn is_complete(&self) -> bool {
-                    true #(&& #is_complete_expr)*
+                    true #(&& #is_complete_exprs)*
                 }
             }
 
-            #(#deserialize_fns)*
+            #extra_items
+        }
+    }
+}
+
+#[derive(Default)]
+struct Parts {
+    field_names: Vec<Ident>,
+    struct_fields: Vec<TokenStream>,
+    nested_bounds: Vec<TokenStream>,
+    empty_exprs: Vec<TokenStream>,
+    default_exprs: Vec<TokenStream>,
+    from_env_exprs: Vec<TokenStream>,
+    fallback_exprs: Vec<TokenStream>,
+    is_empty_exprs: Vec<TokenStream>,
+    is_complete_exprs: Vec<TokenStream>,
+    extra_items: TokenStream,
+}
+
+fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
+    let struct_name = &input.name;
+    let field_name = &f.name;
+    parts.field_names.push(field_name.clone());
+    let qualified_name = format!("{struct_name}::{field_name}");
+
+    // We have to use the span of the field's name here so that error
+    // messages from the `derive(serde::Deserialize)` have the correct span.
+    let field_visibility = inner_visibility(&input.visibility, field_name.span());
+
+
+    match &f.kind {
+        // ----- Nested -------------------------------------------------------------
+        FieldKind::Nested { ty } => {
+            let ty_span = ty.span();
+            let field_ty = quote_spanned! {ty_span=> <#ty as confique::Config>::Partial };
+            parts.struct_fields.push(quote! {
+                #[serde(default = "confique::Partial::empty")]
+                #field_visibility #field_name: #field_ty,
+            });
+
+            parts.nested_bounds.push(quote! { #ty: confique::Config });
+            parts.empty_exprs.push(quote! { confique::Partial::empty() });
+            parts.default_exprs.push(quote! { confique::Partial::default_values() });
+            parts.from_env_exprs.push(quote! { confique::Partial::from_env()? });
+            parts.fallback_exprs.push(quote! {
+                self.#field_name.with_fallback(fallback.#field_name)
+            });
+            parts.is_empty_exprs.push(quote! { self.#field_name.is_empty() });
+            parts.is_complete_exprs.push(quote! { self.#field_name.is_complete() });
+        },
+
+
+        // ----- Leaf ---------------------------------------------------------------
+        FieldKind::Leaf { kind, deserialize_with, validate, env, parse_env } => {
+            let inner_ty = kind.inner_ty();
+
+            // This has an ugly name to avoid clashing with imported names.
+            let validate_fn_name = quote::format_ident!("__confique_validate_{field_name}");
+            let deserialize_fn_name
+                = quote::format_ident!("__confique_deserialize_direct_{field_name}");
+
+            let default_deserialize_path = quote! {
+                <#inner_ty as confique::serde::Deserialize>::deserialize
+            };
+
+            // We sometimes emit extra helper functions to avoid code duplication.
+            // Validation should be part of the serialization. `validation_fn` is
+            // `Some(Ident)` if there is a validator function. `deserialize_fn` is
+            // a token stream that represents a callable function that deserializes
+            // `inner_ty`.
+            let (validate_fn, deserialize_fn) = if let Some(validator) = &validate {
+                let validate_inner = match validator {
+                    ir::FieldValidator::Fn(f) => quote_spanned! {f.span() =>
+                        confique::internal::validate_field(v, &#f)
+                    },
+                    ir::FieldValidator::Simple(expr, msg) => quote! {
+                        fn is_valid(#field_name: &#inner_ty) -> bool {
+                            #expr
+                        }
+                        confique::internal::validate_field(v, &|v| {
+                            if !is_valid(v) {
+                                Err(#msg)
+                            } else {
+                                Ok(())
+                            }
+                        })
+                    },
+                };
+
+                let deser_fn = deserialize_with.as_ref()
+                    .map(|f| quote!( #f ))
+                    .unwrap_or_else(|| default_deserialize_path.clone());
+
+                parts.extra_items.extend(quote! {
+                    #[inline(never)]
+                    fn #validate_fn_name(
+                        v: &#inner_ty,
+                    ) -> std::result::Result<(), confique::Error> {
+                        #validate_inner
+                    }
+
+                    fn #deserialize_fn_name<'de, D>(
+                        deserializer: D,
+                    ) -> std::result::Result<#inner_ty, D::Error>
+                    where
+                        D: confique::serde::Deserializer<'de>,
+                    {
+                        let out = #deser_fn(deserializer)?;
+                        #validate_fn_name(&out)
+                            .map_err(<D::Error as confique::serde::de::Error>::custom)?;
+                        std::result::Result::Ok(out)
+                    }
+                });
+
+                (Some(validate_fn_name), quote! { #deserialize_fn_name })
+            } else {
+                // If there is no validation, we will not create a custom
+                // deserialization function for this, so we either use `T::deserialize`
+                // or, if set, the specified deserialization function.
+                let deser = deserialize_with.as_ref()
+                    .map(|f| quote! { #f })
+                    .unwrap_or(default_deserialize_path);
+                (None, deser)
+            };
+
+
+            // Struct field definition
+            parts.struct_fields.push({
+                // If there is a custom deserializer or a validator, we need to
+                // set the serde `deserialize_with` attribute.
+                let attr = if deserialize_with.is_some() || validate.is_some() {
+                    // Since the struct field is `Option<T>`, we need to create
+                    // another wrapper deserialization function, that always
+                    // returns `Some`.
+                    let fn_name = quote::format_ident!("__confique_deserialize_some_{field_name}");
+                    parts.extra_items.extend(quote! {
+                        fn #fn_name<'de, D>(
+                            deserializer: D,
+                        ) -> std::result::Result<std::option::Option<#inner_ty>, D::Error>
+                        where
+                            D: confique::serde::Deserializer<'de>,
+                        {
+                            #deserialize_fn(deserializer).map(std::option::Option::Some)
+                        }
+                    });
+
+                    let attr_value = fn_name.to_string();
+                    quote! {
+                        #[serde(default, deserialize_with = #attr_value)]
+                    }
+                } else {
+                    quote! {}
+                };
+
+                let main = quote_spanned! {field_name.span()=>
+                    #field_visibility #field_name: std::option::Option<#inner_ty>,
+                };
+                quote! { #attr #main }
+            });
+
+
+            // Some simple ones
+            parts.empty_exprs.push(quote! { std::option::Option::None });
+            parts.fallback_exprs.push(quote! { self.#field_name.or(fallback.#field_name) });
+            parts.is_empty_exprs.push(quote! { self.#field_name.is_none() });
+            if kind.is_required() {
+                parts.is_complete_exprs.push(quote! { self.#field_name.is_some() });
+            }
+
+            // Code for `Partial::default_values()`
+            parts.default_exprs.push(match kind {
+                LeafKind::Required { default: Some(default), .. } => {
+                    let msg = format!("default config value for `{qualified_name}` \
+                        cannot be deserialized");
+                    let expr = default_value_to_deserializable_expr(&default);
+                    quote! {
+                        std::option::Option::Some(
+                            #deserialize_fn(confique::internal::into_deserializer(#expr))
+                                .expect(#msg)
+                        )
+                    }
+                }
+                _ => quote! { std::option::Option::None },
+            });
+
+            // Code for `Partial::from_env()`
+            parts.from_env_exprs.push(match (env, parse_env) {
+                (None, _) => quote! { std::option::Option::None },
+                (Some(key), None) => quote! {
+                    confique::internal::from_env(#key, #qualified_name, #deserialize_fn)?
+                },
+                (Some(key), Some(parse_env)) => {
+                    let validator = match &validate_fn {
+                        Some(f) => quote! { #f },
+                        None => quote! { |_| std::result::Result::<(), String>::Ok(()) },
+                    };
+                    quote! {
+                        confique::internal::from_env_with_parser(
+                            #key, #qualified_name, #parse_env, #validator)?
+                    }
+                }
+            });
         }
     }
 }

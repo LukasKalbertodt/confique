@@ -1,9 +1,9 @@
-use proc_macro2::{TokenStream, Group, Delimiter, Ident};
+use proc_macro2::{Delimiter, Group, Ident, TokenStream, TokenTree};
 use syn::{Error, Token, parse::{Parse, ParseStream}, spanned::Spanned, punctuated::Punctuated};
 
 use crate::{
-    ir::{Input, Field, FieldKind, LeafKind, Expr, MapEntry, MapKey},
-    util::{unwrap_option, is_option},
+    ir::{Expr, Field, FieldKind, FieldValidator, Input, LeafKind, MapEntry, MapKey},
+    util::{is_option, unwrap_option},
 };
 
 
@@ -28,6 +28,7 @@ impl Input {
             doc,
             visibility: input.vis,
             partial_attrs: attrs.partial_attrs,
+            validate: attrs.validate,
             name: input.ident,
             fields,
         })
@@ -39,11 +40,12 @@ impl Input {
 #[derive(Default)]
 struct StructAttrs {
     partial_attrs: Vec<TokenStream>,
+    validate: Option<syn::Path>,
 }
 
-#[derive(Debug)]
 enum StructAttr {
     PartialAttrs(TokenStream),
+    Validate(syn::Path),
 }
 
 impl StructAttrs {
@@ -56,13 +58,37 @@ impl StructAttrs {
             let parsed_list = attr.parse_args_with(AttrList::parse_terminated)?;
 
             for parsed in parsed_list {
+                let keyword = parsed.keyword();
+
+                macro_rules! duplicate_if {
+                    ($cond:expr) => {
+                        if $cond {
+                            let msg = format!("duplicate '{keyword}' confique attribute");
+                            return Err(Error::new(attr.tokens.span(), msg));
+                        }
+                    };
+                }
+
                 match parsed {
                     StructAttr::PartialAttrs(tokens) => out.partial_attrs.push(tokens),
+                    StructAttr::Validate(path) => {
+                        duplicate_if!(out.validate.is_some());
+                        out.validate = Some(path);
+                    }
                 }
             }
         }
 
         Ok(out)
+    }
+}
+
+impl StructAttr {
+    fn keyword(&self) -> &'static str {
+        match self {
+            Self::PartialAttrs(_) => "partial_attr",
+            Self::Validate(_) => "validate",
+        }
     }
 }
 
@@ -79,6 +105,7 @@ impl Parse for StructAttr {
                 assert_empty_or_comma(&input)?;
                 Ok(Self::PartialAttrs(g.stream()))
             }
+            "validate" => parse_eq_value(input).map(Self::Validate),
             _ => Err(syn::Error::new(ident.span(), "unknown confique attribute")),
         }
     }
@@ -99,15 +126,22 @@ impl Field {
             if is_option(&field.ty) {
                 return err("nested configurations cannot be optional (type `Option<_>`)");
             }
-            if attrs.default.is_some() {
-                return err("cannot specify `nested` and `default` attributes at the same time");
-            }
-            if attrs.env.is_some() {
-                return err("cannot specify `nested` and `env` attributes at the same time");
-            }
-            if attrs.deserialize_with.is_some() {
-                return err("cannot specify `nested` and `deserialize_with` attributes \
-                    at the same time");
+
+            let conflicting_attrs = [
+                ("default", attrs.default.is_some()),
+                ("env", attrs.env.is_some()),
+                ("deserialize_with", attrs.deserialize_with.is_some()),
+                ("validate", attrs.validate.is_some()),
+            ];
+
+            for (keyword, is_set) in conflicting_attrs {
+                if is_set {
+                    return Err(Error::new(
+                        field.ident.span(),
+                        format!("cannot specify `nested` and `{keyword}` \
+                            attributes at the same time")
+                    ));
+                }
             }
 
             FieldKind::Nested { ty: field.ty }
@@ -129,6 +163,7 @@ impl Field {
                 env: attrs.env,
                 deserialize_with: attrs.deserialize_with,
                 parse_env: attrs.parse_env,
+                validate: attrs.validate,
                 kind,
             }
         };
@@ -138,10 +173,6 @@ impl Field {
             name: field.ident.expect("bug: expected named field"),
             kind,
         })
-    }
-
-    pub(crate) fn is_leaf(&self) -> bool {
-        matches!(self.kind, FieldKind::Leaf { .. })
     }
 }
 
@@ -155,6 +186,7 @@ struct FieldAttrs {
     env: Option<String>,
     deserialize_with: Option<syn::Path>,
     parse_env: Option<syn::Path>,
+    validate: Option<FieldValidator>,
 }
 
 enum FieldAttr {
@@ -163,6 +195,7 @@ enum FieldAttr {
     Env(String),
     DeserializeWith(syn::Path),
     ParseEnv(syn::Path),
+    Validate(FieldValidator),
 }
 
 impl FieldAttrs {
@@ -207,6 +240,10 @@ impl FieldAttrs {
                         duplicate_if!(out.deserialize_with.is_some());
                         out.deserialize_with = Some(path);
                     }
+                    FieldAttr::Validate(path) => {
+                        duplicate_if!(out.validate.is_some());
+                        out.validate = Some(path);
+                    }
                 }
             }
         }
@@ -223,6 +260,7 @@ impl FieldAttr {
             Self::Env(_) => "env",
             Self::ParseEnv(_) => "parse_env",
             Self::DeserializeWith(_) => "deserialize_with",
+            Self::Validate(_) => "validate",
         }
     }
 }
@@ -236,42 +274,60 @@ impl Parse for FieldAttr {
                 Ok(Self::Nested)
             }
 
-            "default" => {
-                let _: Token![=] = input.parse()?;
-                let expr: Expr = input.parse()?;
-                assert_empty_or_comma(input)?;
-                Ok(Self::Default(expr))
-            }
+            "default" => parse_eq_value(input).map(Self::Default),
 
             "env" => {
-                let _: Token![=] = input.parse()?;
-                let key: syn::LitStr = input.parse()?;
-                assert_empty_or_comma(input)?;
+                let key: syn::LitStr = parse_eq_value(input)?;
                 let value = key.value();
                 if value.contains('=') || value.contains('\0') {
-                    Err(syn::Error::new(
+                    return Err(syn::Error::new(
                         key.span(),
                         "environment variable key must not contain '=' or null bytes",
-                    ))
-                } else {
-                    Ok(Self::Env(value))
+                    ));
                 }
+
+                Ok(Self::Env(value))
             }
 
-            "parse_env" => {
-                let _: Token![=] = input.parse()?;
-                let path: syn::Path = input.parse()?;
-                assert_empty_or_comma(input)?;
+            "parse_env" => parse_eq_value(input).map(Self::ParseEnv),
+            "deserialize_with" => parse_eq_value(input).map(Self::DeserializeWith),
+            "validate" => {
+                if input.peek(Token![=]) {
+                    parse_eq_value(input).map(|path| Self::Validate(FieldValidator::Fn(path)))
+                } else if input.peek(syn::token::Paren) {
+                    let g: Group = input.parse()?;
 
-                Ok(Self::ParseEnv(path))
-            }
+                    // Instead of properly parsing an expression, which would
+                    // require the `full` feature of syn, increasing compile
+                    // time, we just validate the last two/three tokens and
+                    // just assume the tokens before are a valid expression.
+                    let mut tokens = g.stream().into_iter().collect::<Vec<_>>();
+                    if tokens.len() < 3 {
+                        return Err(syn::Error::new(
+                            g.span(),
+                            "expected at least three tokens, found fewer",
+                        ));
+                    }
 
-            "deserialize_with" => {
-                let _: Token![=] = input.parse()?;
-                let path: syn::Path = input.parse()?;
-                assert_empty_or_comma(input)?;
+                    // Ignore trailing comma
+                    if is_comma(tokens.last().unwrap()) {
+                        let _ = tokens.pop();
+                    }
 
-                Ok(Self::DeserializeWith(path))
+                    let msg = as_string_lit(tokens.pop().unwrap())?;
+                    let sep_comma = tokens.pop().unwrap();
+                    if !is_comma(&sep_comma) {
+                        return Err(syn::Error::new(sep_comma.span(), "expected comma"));
+                    }
+
+                    Ok(Self::Validate(FieldValidator::Simple(tokens.into_iter().collect(), msg)))
+                } else {
+                    Err(syn::Error::new(
+                        ident.span(),
+                        "expected `validate = path::to::fun` or `validate(<expr>, \"error msg\")`, \
+                            but found different token",
+                    ))
+                }
             }
 
             _ => Err(syn::Error::new(ident.span(), "unknown confique attribute")),
@@ -347,6 +403,30 @@ fn assert_empty_or_comma(input: ParseStream) -> Result<(), Error> {
     } else {
         Err(Error::new(input.span(), "unexpected tokens, expected no more tokens in this context"))
     }
+}
+
+fn is_comma(tt: &TokenTree) -> bool {
+    matches!(tt, TokenTree::Punct(p) if p.as_char() == ',')
+}
+
+fn as_string_lit(tt: TokenTree) -> Result<String, syn::Error> {
+    let lit = match tt {
+        TokenTree::Literal(lit) => syn::Lit::new(lit),
+        t => return Err(syn::Error::new(t.span(), "expected string literal")),
+    };
+    match lit {
+        syn::Lit::Str(s) => Ok(s.value()),
+        l => return Err(syn::Error::new(l.span(), "expected string literal")),
+    }
+}
+
+/// Parses a `=` followed by `T`, and asserts that the input is either empty or
+/// a comma follows.
+fn parse_eq_value<T: syn::parse::Parse>(input: ParseStream) -> Result<T, Error> {
+    let _: Token![=] = input.parse()?;
+    let out: T = input.parse()?;
+    assert_empty_or_comma(&input)?;
+    Ok(out)
 }
 
 /// Extracts all doc string attributes from the list and returns them as list of

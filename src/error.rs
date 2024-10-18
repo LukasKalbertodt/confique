@@ -17,6 +17,12 @@ pub struct Error {
     pub(crate) inner: Box<ErrorInner>,
 }
 
+impl Error {
+    pub(crate) fn field_validation(msg: impl fmt::Display) -> Self {
+        ErrorInner::FieldValidation { msg: msg.to_string() }.into()
+    }
+}
+
 // If all these features are disabled, lots of these errors are unused. But
 // instead of repeating this cfg-attribute a lot in the rest of the file, we
 // just live with these unused variants. It's not like we need to optimize the
@@ -76,6 +82,12 @@ pub(crate) enum ErrorInner {
 
     /// A file source was marked as required but the file does not exist.
     MissingRequiredFile { path: PathBuf },
+
+    /// When a field validation function fails.
+    FieldValidation { msg: String },
+
+    /// When a struct validation function fails.
+    StructValidation { name: String, msg: String },
 }
 
 impl std::error::Error for Error {
@@ -90,6 +102,8 @@ impl std::error::Error for Error {
             ErrorInner::UnsupportedFileFormat { .. } => None,
             ErrorInner::MissingFileExtension { .. } => None,
             ErrorInner::MissingRequiredFile { .. } => None,
+            ErrorInner::FieldValidation { .. } => None,
+            ErrorInner::StructValidation { .. } => None,
         }
     }
 }
@@ -159,6 +173,12 @@ impl fmt::Display for Error {
                     "required configuration file does not exist: '{}'",
                     path.display(),
                 )
+            }
+            ErrorInner::FieldValidation { msg } => {
+                std::write!(f, "validation failed: {msg}")
+            }
+            ErrorInner::StructValidation { name, msg } => {
+                std::write!(f, "config validation of `{name}` failed: {msg}")
             }
         }
     }
