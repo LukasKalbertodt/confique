@@ -367,7 +367,7 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
 /// Returns the names of the module and struct for the partial type:
 /// `(mod_name, struct_name)`.
 fn partial_names(original_name: &Ident) -> (Ident, Ident) {
-    use heck::SnakeCase;
+    use heck::ToSnakeCase;
     (
         format_ident!("confique_partial_{}", original_name.to_string().to_snake_case()),
         format_ident!("Partial{original_name}"),
