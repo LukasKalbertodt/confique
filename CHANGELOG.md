@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.3.0] - 2024-10-18
+
+- **Breaking**: Raise MSRV to 1.61.0
+- **Breaking**: `toml`, `yaml` and `json5` are no longer default features ([`19d9ddc`](https://github.com/LukasKalbertodt/confique/commit/19d9ddc9537baf4e82274591ba92f02d4c5c1f36)). You now have to manually specify the features you need in `Cargo.toml`.
+- **Breaking**: env vars set to an empty string, which fail to deserialize/parse/validate are now treated as not set. This is technically a breaking change, but I think this is the expected behavior and shouldn't affect you. ([#39](https://github.com/LukasKalbertodt/confique/pull/39))
+- ⭐ Add validation feature ([#40](https://github.com/LukasKalbertodt/confique/pull/40))
+  - `#[config(validate = path::to::function)] field: u32` to call the given function during field deserialization.
+  - `#[config(validate(!s.is_empty(), "user must not be empty"))] user: String` is a `assert!`-style syntax to simple validation checks.
+  - Validation can also be added to full structs.
+  - See docs and examples for more information!
+- Stop including `Error::source` in the `Display` output of `Error` ([`d454f0957`](https://github.com/LukasKalbertodt/confique/commit/d454f0957eb1cb4d566ebc448224b323a609d080))
+- Improve & refactor docs of `derive(Config` a bit
+- Update dependencies (syn to 2.0, heck to 0.5): this shouldn't affect you, except for faster compile times due to smaller dependency tree.
+
+
 ## [0.2.6] - 2024-10-10
 - Fix compile errors when using `confique` derive without having `serde` in your direct dependencies (see [#38](https://github.com/LukasKalbertodt/confique/issues/38)).
 - Update `toml` dependency to 0.8
@@ -108,7 +123,8 @@ All notable changes to this project will be documented in this file.
 - Everything.
 
 
-[Unreleased]: https://github.com/LukasKalbertodt/confique/compare/v0.2.6...HEAD
+[Unreleased]: https://github.com/LukasKalbertodt/confique/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/LukasKalbertodt/confique/compare/v0.2.6...v0.3.0
 [0.2.6]: https://github.com/LukasKalbertodt/confique/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/LukasKalbertodt/confique/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/LukasKalbertodt/confique/compare/v0.2.3...v0.2.4

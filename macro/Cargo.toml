@@ -1,6 +1,6 @@
 [package]
 name = "confique-macro"
-version = "0.0.10"
+version = "0.0.11"
 authors = ["Lukas Kalbertodt <lukas.kalbertodt@gmail.com>"]
 edition = "2021"
 
