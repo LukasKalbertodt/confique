@@ -79,7 +79,8 @@
 //!
 //! You can also attach some other attributes to fields. For example, with
 //! `#[config(env = "KEY")]`, you can load a value from an environment variable.
-//! For more information, see the [docs for the derive macro][macro@Config].
+//! With `#[config(validate = ...)]` you can add validation checks. For more
+//! information, see the [docs for the derive macro][macro@Config].
 //!
 //!
 //! ## Loading the configuration

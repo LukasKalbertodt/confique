@@ -17,6 +17,7 @@ Confique is a rather light-weight library that helps with configuration manageme
     - Anything with a `serde` Deserializer
 - **Based on `serde`**: less code in `confique` (more light-weight) and access to a huge ecosystem of high quality parsers.
 - **Easily generate configuration "templates"**: describe all available config values to your users without repeating yourself.
+- **Simple validation**: validity checks can easily be added via attributes.
 
 
 ## Simple example
@@ -45,6 +46,7 @@ struct LogConf {
     #[config(default = true)]
     stdout: bool,
 
+    #[config(validate(file.is_absolute(), "log file requires absolute path"))]
     file: Option<PathBuf>,
 
     #[config(default = ["debug"])]
