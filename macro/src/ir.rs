@@ -30,12 +30,14 @@ pub(crate) enum FieldKind {
         deserialize_with: Option<syn::Path>,
         parse_env: Option<syn::Path>,
         validate: Option<FieldValidator>,
+        partial_attr: Option<TokenStream>,
         kind: LeafKind,
     },
 
     /// A nested configuration. The type is never `Option<_>`.
     Nested {
         ty: syn::Type,
+        partial_attr: Option<TokenStream>
     },
 }
 

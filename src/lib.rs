@@ -494,6 +494,8 @@ pub use crate::{
 /// For example, `#[config(partial_attr(derive(Clone)))]` can be used to make
 /// the partial type implement `Clone`.
 ///
+/// This attribute can also be applied to struct fields.
+///
 ///
 /// # What the macro generates
 ///

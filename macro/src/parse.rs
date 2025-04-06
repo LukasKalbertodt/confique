@@ -144,7 +144,7 @@ impl Field {
                 }
             }
 
-            FieldKind::Nested { ty: field.ty }
+            FieldKind::Nested { ty: field.ty, partial_attr: attrs.partial_attr }
         } else {
             if attrs.env.is_none() && attrs.parse_env.is_some() {
                 return err("cannot specify `parse_env` attribute without the `env` attribute");
@@ -164,6 +164,7 @@ impl Field {
                 deserialize_with: attrs.deserialize_with,
                 parse_env: attrs.parse_env,
                 validate: attrs.validate,
+                partial_attr: attrs.partial_attr,
                 kind,
             }
         };
@@ -187,6 +188,7 @@ struct FieldAttrs {
     deserialize_with: Option<syn::Path>,
     parse_env: Option<syn::Path>,
     validate: Option<FieldValidator>,
+    partial_attr: Option<TokenStream>,
 }
 
 enum FieldAttr {
@@ -196,6 +198,7 @@ enum FieldAttr {
     DeserializeWith(syn::Path),
     ParseEnv(syn::Path),
     Validate(FieldValidator),
+    PartialAttr(TokenStream),
 }
 
 impl FieldAttrs {
@@ -244,6 +247,10 @@ impl FieldAttrs {
                         duplicate_if!(out.validate.is_some());
                         out.validate = Some(path);
                     }
+                    FieldAttr::PartialAttr(partial_attr) => {
+                        duplicate_if!(out.partial_attr.is_some());
+                        out.partial_attr = Some(partial_attr);
+                    }
                 }
             }
         }
@@ -261,6 +268,7 @@ impl FieldAttr {
             Self::ParseEnv(_) => "parse_env",
             Self::DeserializeWith(_) => "deserialize_with",
             Self::Validate(_) => "validate",
+            Self::PartialAttr(_) => "partial_attr",
         }
     }
 }
@@ -328,6 +336,10 @@ impl Parse for FieldAttr {
                             but found different token",
                     ))
                 }
+            }
+            "partial_attr" => {
+                let group: Group = input.parse()?;
+                Ok(Self::PartialAttr(group.stream()))
             }
 
             _ => Err(syn::Error::new(ident.span(), "unknown confique attribute")),
