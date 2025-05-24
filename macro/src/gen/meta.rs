@@ -21,7 +21,7 @@ pub(super) fn gen(input: &ir::Input) -> TokenStream {
         let name = f.name.to_string();
         let doc =  &f.doc;
         let kind = match &f.kind {
-            FieldKind::Nested { ty, partial_attr: _ } => {
+            FieldKind::Nested { ty } => {
                 quote! {
                     confique::meta::FieldKind::Nested { meta: &<#ty as confique::Config>::META }
                 }

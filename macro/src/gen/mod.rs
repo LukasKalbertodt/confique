@@ -190,12 +190,12 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
 
     match &f.kind {
         // ----- Nested -------------------------------------------------------------
-        FieldKind::Nested { ty, partial_attr } => {
+        FieldKind::Nested { ty } => {
             let ty_span = ty.span();
             let field_ty = quote_spanned! {ty_span=> <#ty as confique::Config>::Partial };
-            let partial_attr = attr_expression_to_tokens(partial_attr.as_ref());
+            let partial_attrs = &f.partial_attrs;
             parts.struct_fields.push(quote! {
-                #partial_attr
+                 #( #[ #partial_attrs ])*
                 #[serde(default = "confique::Partial::empty")]
                 #field_visibility #field_name: #field_ty,
             });
@@ -213,14 +213,7 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
 
 
         // ----- Leaf ---------------------------------------------------------------
-        FieldKind::Leaf {
-            kind,
-            deserialize_with,
-            validate,
-            env,
-            parse_env,
-            partial_attr,
-        } => {
+        FieldKind::Leaf { kind, deserialize_with, validate, env, parse_env } => {
             let inner_ty = kind.inner_ty();
 
             // This has an ugly name to avoid clashing with imported names.
@@ -324,8 +317,8 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
                 let main = quote_spanned! {field_name.span()=>
                     #field_visibility #field_name: std::option::Option<#inner_ty>,
                 };
-                let partial_attr = attr_expression_to_tokens(partial_attr.as_ref());
-                quote! { #attr #partial_attr #main }
+                let partial_attrs = &f.partial_attrs;
+                quote! { #attr #( #[ #partial_attrs ])* #main }
             });
 
 
@@ -372,11 +365,6 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
             });
         }
     }
-}
-
-/// Generates a valid attribute expression from a path expression or empty value
-fn attr_expression_to_tokens(attr_expression: Option<&TokenStream>) -> TokenStream {
-    attr_expression.map(|p| quote!(#[#p])).unwrap_or_default()
 }
 
 /// Returns the names of the module and struct for the partial type:

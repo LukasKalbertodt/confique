@@ -17,6 +17,7 @@ pub(crate) struct Field {
     pub(crate) doc: Vec<String>,
     pub(crate) name: syn::Ident,
     pub(crate) kind: FieldKind,
+    pub(crate) partial_attrs: Vec<TokenStream>
 
     // TODO:
     // - serde attributes
@@ -30,14 +31,12 @@ pub(crate) enum FieldKind {
         deserialize_with: Option<syn::Path>,
         parse_env: Option<syn::Path>,
         validate: Option<FieldValidator>,
-        partial_attr: Option<TokenStream>,
         kind: LeafKind,
     },
 
     /// A nested configuration. The type is never `Option<_>`.
     Nested {
         ty: syn::Type,
-        partial_attr: Option<TokenStream>
     },
 }
 
