@@ -2,7 +2,7 @@
 //!
 //! The core of the library is the [`Config`] trait and [its derive-macro][macro@Config].
 //! You define your configuration value as one or more structs, each of which has
-//! to `#[derive(Config)]`. Then you can use different ways of loading an instancce
+//! to `#[derive(Config)]`. Then you can use different ways of loading an instance
 //! of your root configuration struct.
 //!
 //!
