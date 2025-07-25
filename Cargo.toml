@@ -48,6 +48,7 @@ toml = { version = "0.8", optional = true }
 
 [dev-dependencies]
 pretty_assertions = "1.2.1"
+derive_more = { version = "2.0.1", features = ["debug", "display", "deref"] }
 
 
 [package.metadata.docs.rs]

@@ -193,7 +193,9 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
         FieldKind::Nested { ty } => {
             let ty_span = ty.span();
             let field_ty = quote_spanned! {ty_span=> <#ty as confique::Config>::Partial };
+            let partial_attrs = &f.partial_attrs;
             parts.struct_fields.push(quote! {
+                 #( #[ #partial_attrs ])*
                 #[serde(default = "confique::Partial::empty")]
                 #field_visibility #field_name: #field_ty,
             });
@@ -315,7 +317,8 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
                 let main = quote_spanned! {field_name.span()=>
                     #field_visibility #field_name: std::option::Option<#inner_ty>,
                 };
-                quote! { #attr #main }
+                let partial_attrs = &f.partial_attrs;
+                quote! { #attr #( #[ #partial_attrs ])* #main }
             });
 
 

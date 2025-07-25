@@ -1,5 +1,10 @@
 use proc_macro2::{Delimiter, Group, Ident, TokenStream, TokenTree};
-use syn::{Error, Token, parse::{Parse, ParseStream}, spanned::Spanned, punctuated::Punctuated};
+use syn::{
+    parse::{Parse, ParseBuffer, ParseStream},
+    punctuated::Punctuated,
+    spanned::Spanned,
+    Error, Token,
+};
 
 use crate::{
     ir::{Expr, Field, FieldKind, FieldValidator, Input, LeafKind, MapEntry, MapKey},
@@ -97,13 +102,8 @@ impl Parse for StructAttr {
         let ident: Ident = input.parse()?;
         match &*ident.to_string() {
             "partial_attr" => {
-                let g: Group = input.parse()?;
-                if g.delimiter() != Delimiter::Parenthesis {
-                    return Err(Error::new_spanned(g,
-                        "expected `(...)` but found different delimiter"));
-                }
-                assert_empty_or_comma(&input)?;
-                Ok(Self::PartialAttrs(g.stream()))
+                let partial_stream = parse_partial_attr(input)?;
+                Ok(Self::PartialAttrs(partial_stream))
             }
             "validate" => parse_eq_value(input).map(Self::Validate),
             _ => Err(syn::Error::new(ident.span(), "unknown confique attribute")),
@@ -172,6 +172,7 @@ impl Field {
             doc,
             name: field.ident.expect("bug: expected named field"),
             kind,
+            partial_attrs: attrs.partial_attrs
         })
     }
 }
@@ -187,6 +188,7 @@ struct FieldAttrs {
     deserialize_with: Option<syn::Path>,
     parse_env: Option<syn::Path>,
     validate: Option<FieldValidator>,
+    partial_attrs: Vec<TokenStream>,
 }
 
 enum FieldAttr {
@@ -196,6 +198,7 @@ enum FieldAttr {
     DeserializeWith(syn::Path),
     ParseEnv(syn::Path),
     Validate(FieldValidator),
+    PartialAttr(TokenStream),
 }
 
 impl FieldAttrs {
@@ -244,6 +247,9 @@ impl FieldAttrs {
                         duplicate_if!(out.validate.is_some());
                         out.validate = Some(path);
                     }
+                    FieldAttr::PartialAttr(partial_attr) => {
+                        out.partial_attrs.push(partial_attr);
+                    }
                 }
             }
         }
@@ -261,6 +267,7 @@ impl FieldAttr {
             Self::ParseEnv(_) => "parse_env",
             Self::DeserializeWith(_) => "deserialize_with",
             Self::Validate(_) => "validate",
+            Self::PartialAttr(_) => "partial_attr",
         }
     }
 }
@@ -329,6 +336,10 @@ impl Parse for FieldAttr {
                     ))
                 }
             }
+            "partial_attr" => {
+                let partial_stream = parse_partial_attr(input)?;
+                Ok(Self::PartialAttr(partial_stream))
+            }
 
             _ => Err(syn::Error::new(ident.span(), "unknown confique attribute")),
         }
@@ -396,6 +407,16 @@ impl Parse for MapKey {
 
 
 // ===== Util =====================================================================
+
+fn parse_partial_attr(input: &ParseBuffer<'_>) -> syn::Result<TokenStream> {
+    let g: Group = input.parse()?;
+    if g.delimiter() != Delimiter::Parenthesis {
+        return Err(Error::new_spanned(g,
+            "expected `(...)` but found different delimiter"));
+    }
+    assert_empty_or_comma(&input)?;
+    Ok(g.stream())
+}
 
 fn assert_empty_or_comma(input: ParseStream) -> Result<(), Error> {
     if input.is_empty() || input.peek(Token![,]) {
