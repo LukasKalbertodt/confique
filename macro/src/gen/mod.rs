@@ -194,8 +194,10 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
             let ty_span = ty.span();
             let field_ty = quote_spanned! {ty_span=> <#ty as confique::Config>::Partial };
             let partial_attrs = &f.partial_attrs;
+            let docs = &f.doc;
             parts.struct_fields.push(quote! {
-                 #( #[ #partial_attrs ])*
+                #( #[ #partial_attrs ])*
+                #( #[ doc = #docs ] )*
                 #[serde(default = "confique::Partial::empty")]
                 #field_visibility #field_name: #field_ty,
             });
@@ -318,7 +320,13 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
                     #field_visibility #field_name: Option<#inner_ty>,
                 };
                 let partial_attrs = &f.partial_attrs;
-                quote! { #attr #( #[ #partial_attrs ])* #main }
+                let docs = &f.doc;
+                quote! {
+                    #attr
+                    #( #[ #partial_attrs ])*
+                    #( #[ doc = #docs ] )*
+                    #main
+                }
             });
 
 
