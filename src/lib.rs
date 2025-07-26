@@ -665,8 +665,9 @@ pub trait Partial: for<'de> Deserialize<'de> {
     /// annotated `env` will be `None`.
     ///
     /// If the env variable corresponding to a field is not set, that field is
-    /// `None`. If it is set but it failed to deserialize into the target type,
-    /// an error is returned.
+    /// `None`. If it is set and non-empty, but it failed to deserialize into
+    /// the target type, an error is returned. If set to an empty string *and*
+    /// if it fails to deserialize, it's treated as not set.
     fn from_env() -> Result<Self, Error>;
 
     /// Combines two partial configuration objects. `self` has a higher
