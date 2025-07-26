@@ -377,10 +377,10 @@ pub use crate::{
 /// #[config(validate(<expr>, "msg"))]
 /// ```
 ///
-/// Adds a validation to the field, i.e. a check that must suceed to be able to
+/// Adds a validation to the field, i.e. a check that must succeed to be able to
 /// load the configuration. The validator is called as part of the
 /// deserialization, and is thus executed for all layers, not just for the
-/// merged configuration.
+/// merged configuration. The attribute can be specified multiple times.
 ///
 /// > *Note*: remember ["Parse, don't validate"][parse-not-validate]! If you can
 ///    reasonably represent your validation logic as a type, you should use
@@ -438,7 +438,10 @@ pub use crate::{
 ///
 /// #[derive(Config)]
 /// struct Conf {
-///     #[config(validate(!name.is_empty(), "name must not be empty"))]
+///     #[config(
+///         validate(!name.is_empty(), "name must not be empty"),
+///         validate(name.is_ascii(), "name must be ASCII"),
+///     )]
 ///     name: String,
 ///
 ///     #[config(validate(*port >= 1024, "cannot use ports < 1024 as non-root user"))]

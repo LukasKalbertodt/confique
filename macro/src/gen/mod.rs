@@ -232,24 +232,24 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
             // `Some(Ident)` if there is a validator function. `deserialize_fn` is
             // a token stream that represents a callable function that deserializes
             // `inner_ty`.
-            let (validate_fn, deserialize_fn) = if let Some(validator) = &validate {
-                let validate_inner = match validator {
+            let (validate_fn, deserialize_fn) = if validate.len() > 0 {
+                let validate_inner = validate.iter().map(|validator| match validator {
                     ir::FieldValidator::Fn(f) => quote_spanned! {f.span() =>
-                        confique::internal::validate_field(v, &#f)
+                        confique::internal::validate_field(v, &#f)?;
                     },
                     ir::FieldValidator::Simple(expr, msg) => quote! {
-                        fn is_valid(#field_name: &#inner_ty) -> bool {
-                            #expr
-                        }
                         confique::internal::validate_field(v, &|v| {
+                            fn is_valid(#field_name: &#inner_ty) -> bool {
+                                #expr
+                            }
                             if !is_valid(v) {
-                                Err(#msg)
+                                return Err(#msg);
                             } else {
                                 Ok(())
                             }
-                        })
+                        })?;
                     },
-                };
+                }).collect::<TokenStream>();
 
                 let deser_fn = deserialize_with.as_ref()
                     .map(|f| quote!( #f ))
@@ -261,6 +261,7 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
                         v: &#inner_ty,
                     ) -> std::result::Result<(), confique::Error> {
                         #validate_inner
+                        Ok(())
                     }
 
                     fn #deserialize_fn_name<'de, D>(
@@ -292,7 +293,7 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
             parts.struct_fields.push({
                 // If there is a custom deserializer or a validator, we need to
                 // set the serde `deserialize_with` attribute.
-                let attr = if deserialize_with.is_some() || validate.is_some() {
+                let attr = if deserialize_with.is_some() || validate.len() > 0 {
                     // Since the struct field is `Option<T>`, we need to create
                     // another wrapper deserialization function, that always
                     // returns `Some`.

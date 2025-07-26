@@ -63,6 +63,14 @@ fn assert_like() {
             validate(opt.is_ascii(), "non-ASCII characters ~opt are not allowed"),
         )]
         opt: Option<String>,
+
+
+        #[config(
+            env = "AL_MULTI",
+            validate(multi.is_ascii(), "non-ASCII characters ~multi are not allowed"),
+            validate(multi != "banana", "banana ~multi"),
+        )]
+        multi: String,
     }
 
     type Partial = <Conf as Config>::Partial;
@@ -72,6 +80,7 @@ fn assert_like() {
         req: None,
         def: Some("root".into()),
         opt: None,
+        multi: None,
     });
 
 
@@ -83,6 +92,7 @@ fn assert_like() {
         req: Some("cat".into()),
         def: None,
         opt: None,
+        multi: None,
     });
 
     std::env::set_var("AL_DEF", "I ❤️ fluffy animals");
@@ -92,6 +102,7 @@ fn assert_like() {
         req: Some("cat".into()),
         def: Some("dog".into()),
         opt: None,
+        multi: None,
     });
 
     std::env::set_var("AL_OPT", "Μου αρέσουν τα χνουδωτά ζώα");
@@ -101,6 +112,20 @@ fn assert_like() {
         req: Some("cat".into()),
         def: Some("dog".into()),
         opt: Some("fox".into()),
+        multi: None,
+    });
+
+
+    std::env::set_var("AL_MULTI", "Μου αρέσουν τα χνουδωτά ζώα");
+    assert_err_contains(Partial::from_env(), "non-ASCII characters ~multi are not allowed");
+    std::env::set_var("AL_MULTI", "banana");
+    assert_err_contains(Partial::from_env(), "banana ~multi");
+    std::env::set_var("AL_MULTI", "mouse");
+    assert_eq!(Partial::from_env().unwrap(), Partial {
+        req: Some("cat".into()),
+        def: Some("dog".into()),
+        opt: Some("fox".into()),
+        multi: Some("mouse".into()),
     });
 
 
@@ -117,12 +142,22 @@ fn assert_like() {
         toml::from_str::<Partial>(r#"opt = "Μου αρέσουν τα χνουδωτά ζώα""#),
         "non-ASCII characters ~opt are not allowed",
     );
+    assert_err_contains(
+        toml::from_str::<Partial>(r#"multi = "Μου αρέσουν τα χνουδωτά ζώα""#),
+        "non-ASCII characters ~multi are not allowed",
+    );
+    assert_err_contains(
+        toml::from_str::<Partial>(r#"multi = "banana""#),
+        "banana ~multi",
+    );
     assert_eq!(
-        toml::from_str::<Partial>("req = \"cat\"\ndef = \"dog\"\nopt = \"fox\"").unwrap(),
+        toml::from_str::<Partial>("req = \"cat\"\ndef = \"dog\"\nopt = \"fox\"\nmulti = \"mouse\"")
+            .unwrap(),
         Partial {
             req: Some("cat".into()),
             def: Some("dog".into()),
             opt: Some("fox".into()),
+            multi: Some("mouse".into()),
         },
     );
 }
@@ -130,6 +165,14 @@ fn assert_like() {
 fn assert_is_ascii(s: &String) -> Result<(), &'static str> {
     if !s.is_ascii() {
         Err("non-ASCII characters are not allowed")
+    } else {
+        Ok(())
+    }
+}
+
+fn assert_non_banana(s: &String) -> Result<(), &'static str> {
+    if s == "banana" {
+        Err("banana")
     } else {
         Ok(())
     }
@@ -149,6 +192,9 @@ fn function() {
 
         #[config(env = "FN_OPT", validate = assert_is_ascii)]
         opt: Option<String>,
+
+        #[config(env = "FN_MULTI", validate = assert_is_ascii, validate = assert_non_banana)]
+        multi: String,
     }
 
     type Partial = <Conf as Config>::Partial;
@@ -158,6 +204,7 @@ fn function() {
         req: None,
         def: Some("root".into()),
         opt: None,
+        multi: None,
     });
 
 
@@ -169,6 +216,7 @@ fn function() {
         req: Some("cat".into()),
         def: None,
         opt: None,
+        multi: None,
     });
 
     std::env::set_var("FN_DEF", "I ❤️ fluffy animals");
@@ -178,6 +226,7 @@ fn function() {
         req: Some("cat".into()),
         def: Some("dog".into()),
         opt: None,
+        multi: None,
     });
 
     std::env::set_var("FN_OPT", "Μου αρέσουν τα χνουδωτά ζώα");
@@ -187,8 +236,20 @@ fn function() {
         req: Some("cat".into()),
         def: Some("dog".into()),
         opt: Some("fox".into()),
+        multi: None,
     });
 
+    std::env::set_var("FN_MULTI", "Μου αρέσουν τα χνουδωτά ζώα");
+    assert_err_contains(Partial::from_env(), "non-ASCII characters are not allowed");
+    std::env::set_var("FN_MULTI", "banana");
+    assert_err_contains(Partial::from_env(), "banana");
+    std::env::set_var("FN_MULTI", "mouse");
+    assert_eq!(Partial::from_env().unwrap(), Partial {
+        req: Some("cat".into()),
+        def: Some("dog".into()),
+        opt: Some("fox".into()),
+        multi: Some("mouse".into()),
+    });
 
     // From file
     assert_err_contains(
@@ -203,12 +264,22 @@ fn function() {
         toml::from_str::<Partial>(r#"opt = "Μου αρέσουν τα χνουδωτά ζώα""#),
         "non-ASCII characters are not allowed",
     );
+    assert_err_contains(
+        toml::from_str::<Partial>(r#"multi = "Μου αρέσουν τα χνουδωτά ζώα""#),
+        "non-ASCII characters are not allowed",
+    );
+    assert_err_contains(
+        toml::from_str::<Partial>(r#"multi = "banana""#),
+        "banana",
+    );
     assert_eq!(
-        toml::from_str::<Partial>("req = \"cat\"\ndef = \"dog\"\nopt = \"fox\"").unwrap(),
+        toml::from_str::<Partial>("req = \"cat\"\ndef = \"dog\"\nopt = \"fox\"\nmulti = \"mouse\"")
+            .unwrap(),
         Partial {
             req: Some("cat".into()),
             def: Some("dog".into()),
             opt: Some("fox".into()),
+            multi: Some("mouse".into()),
         },
     );
 }

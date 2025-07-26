@@ -30,7 +30,7 @@ pub(crate) enum FieldKind {
         env: Option<String>,
         deserialize_with: Option<syn::Path>,
         parse_env: Option<syn::Path>,
-        validate: Option<FieldValidator>,
+        validate: Vec<FieldValidator>,
         kind: LeafKind,
     },
 

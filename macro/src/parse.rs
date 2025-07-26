@@ -131,7 +131,7 @@ impl Field {
                 ("default", attrs.default.is_some()),
                 ("env", attrs.env.is_some()),
                 ("deserialize_with", attrs.deserialize_with.is_some()),
-                ("validate", attrs.validate.is_some()),
+                ("validate", !attrs.validate.is_empty()),
             ];
 
             for (keyword, is_set) in conflicting_attrs {
@@ -187,7 +187,7 @@ struct FieldAttrs {
     env: Option<String>,
     deserialize_with: Option<syn::Path>,
     parse_env: Option<syn::Path>,
-    validate: Option<FieldValidator>,
+    validate: Vec<FieldValidator>,
     partial_attrs: Vec<TokenStream>,
 }
 
@@ -243,9 +243,8 @@ impl FieldAttrs {
                         duplicate_if!(out.deserialize_with.is_some());
                         out.deserialize_with = Some(path);
                     }
-                    FieldAttr::Validate(path) => {
-                        duplicate_if!(out.validate.is_some());
-                        out.validate = Some(path);
+                    FieldAttr::Validate(validator) => {
+                        out.validate.push(validator);
                     }
                     FieldAttr::PartialAttr(partial_attr) => {
                         out.partial_attrs.push(partial_attr);
