@@ -289,7 +289,9 @@ pub use crate::{
 /// - **`Option<T>`**: this marks the field as an optional field. All other
 ///   fields are non-optional and will raise an error if while loading the
 ///   configuration, no value has been set for them. Optional fields cannot have
-///   a `#[config(default = ...)]` attribute as that would not make sense.
+///   a `#[config(default = ...)]` attribute as that would not make sense. Note:
+///   the (unqualified) symbol `Option` must be in scope and refer to
+///   `std::option::Option`.
 ///
 ///
 /// ## Field Attributes

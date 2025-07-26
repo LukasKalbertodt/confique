@@ -298,11 +298,11 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
                     parts.extra_items.extend(quote! {
                         fn #fn_name<'de, D>(
                             deserializer: D,
-                        ) -> std::result::Result<std::option::Option<#inner_ty>, D::Error>
+                        ) -> std::result::Result<Option<#inner_ty>, D::Error>
                         where
                             D: confique::serde::Deserializer<'de>,
                         {
-                            #deserialize_fn(deserializer).map(std::option::Option::Some)
+                            #deserialize_fn(deserializer).map(Option::Some)
                         }
                     });
 
@@ -315,7 +315,7 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
                 };
 
                 let main = quote_spanned! {field_name.span()=>
-                    #field_visibility #field_name: std::option::Option<#inner_ty>,
+                    #field_visibility #field_name: Option<#inner_ty>,
                 };
                 let partial_attrs = &f.partial_attrs;
                 quote! { #attr #( #[ #partial_attrs ])* #main }
@@ -323,7 +323,7 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
 
 
             // Some simple ones
-            parts.empty_exprs.push(quote! { std::option::Option::None });
+            parts.empty_exprs.push(quote! { Option::None });
             parts.fallback_exprs.push(quote! { self.#field_name.or(fallback.#field_name) });
             parts.is_empty_exprs.push(quote! { self.#field_name.is_none() });
             if kind.is_required() {
@@ -337,18 +337,18 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
                         cannot be deserialized");
                     let expr = default_value_to_deserializable_expr(&default);
                     quote! {
-                        std::option::Option::Some(
+                        Option::Some(
                             #deserialize_fn(confique::internal::into_deserializer(#expr))
                                 .expect(#msg)
                         )
                     }
                 }
-                _ => quote! { std::option::Option::None },
+                _ => quote! { Option::None },
             });
 
             // Code for `Partial::from_env()`
             parts.from_env_exprs.push(match (env, parse_env) {
-                (None, _) => quote! { std::option::Option::None },
+                (None, _) => quote! { Option::None },
                 (Some(key), None) => quote! {
                     confique::internal::from_env(#key, #qualified_name, #deserialize_fn)?
                 },

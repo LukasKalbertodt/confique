@@ -6,6 +6,9 @@ extern crate std;
 
 use confique::Config;
 
+// This one symbol is required
+use std::option::Option;
+
 
 #[derive(Debug, Config)]
 /// A sample configuration for our app.

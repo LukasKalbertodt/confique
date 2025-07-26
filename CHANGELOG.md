@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 
 ## [Unreleased]
+- **Breaking**: require the (unresolved) symbol `Option` to be in scope and refer to `std::option::Option` where `derive(Config)` is used.
+  - While technically breaking, this is unlikely to affect anyone, since hardly any Rust code shadows `Option`.
+  - This change allows `confique` to emit just `Option` for the partial type, which in turn enables you to use other derives with it (e.g. `clap`).
 
 ## [0.3.1] - 2025-07-26
 - Allow `#[config(partial_attr(...))]` on fields (thanks @aschey, in [#44](https://github.com/LukasKalbertodt/confique/pull/44))
