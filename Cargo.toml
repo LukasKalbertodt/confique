@@ -9,7 +9,7 @@ description = "Type-safe, layered, light-weight, `serde`-based configuration lib
 documentation = "https://docs.rs/confique/"
 repository = "https://github.com/LukasKalbertodt/confique/"
 readme = "README.md"
-license = "MIT/Apache-2.0"
+license = "MIT OR Apache-2.0"
 
 keywords = ["config", "configuration", "conf", "serde", "type-safe"]
 categories = ["config"]
