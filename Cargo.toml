@@ -1,6 +1,6 @@
 [package]
 name = "confique"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["Lukas Kalbertodt <lukas.kalbertodt@gmail.com>"]
 edition = "2021"
 rust-version = "1.61.0"
@@ -40,7 +40,7 @@ yaml = ["serde_yaml"]
 
 
 [dependencies]
-confique-macro = { version = "=0.0.11", path = "macro" }
+confique-macro = { version = "=0.0.12", path = "macro" }
 json5 = { version = "0.4.1", optional = true }
 serde = { version = "1.0.145", features = ["derive"] }
 serde_yaml = { version = "0.9.0", optional = true }

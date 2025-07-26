@@ -5,8 +5,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-## [0.3.0] - 2024-10-18
+## [0.3.1] - 2025-07-26
+- Allow `#[config(partial_attr(...))]` on fields (thanks @aschey, in [#44](https://github.com/LukasKalbertodt/confique/pull/44))
+- Update `toml` dependency to 0.9
+- Fix outdated description in docs of `Partial::from_env`
+- Fix typo in docs
+- Fix license in `Cargo.toml` to use proper SPDX syntax
+- Specify exact version requirement of dependencies
 
+## [0.3.0] - 2024-10-18
 - **Breaking**: Raise MSRV to 1.61.0
 - **Breaking**: `toml`, `yaml` and `json5` are no longer default features ([`19d9ddc`](https://github.com/LukasKalbertodt/confique/commit/19d9ddc9537baf4e82274591ba92f02d4c5c1f36)). You now have to manually specify the features you need in `Cargo.toml`.
 - **Breaking**: env vars set to an empty string, which fail to deserialize/parse/validate are now treated as not set. This is technically a breaking change, but I think this is the expected behavior and shouldn't affect you. ([#39](https://github.com/LukasKalbertodt/confique/pull/39))
@@ -123,7 +130,8 @@ All notable changes to this project will be documented in this file.
 - Everything.
 
 
-[Unreleased]: https://github.com/LukasKalbertodt/confique/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/LukasKalbertodt/confique/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/LukasKalbertodt/confique/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/LukasKalbertodt/confique/compare/v0.2.6...v0.3.0
 [0.2.6]: https://github.com/LukasKalbertodt/confique/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/LukasKalbertodt/confique/compare/v0.2.4...v0.2.5
