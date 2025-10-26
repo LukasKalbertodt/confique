@@ -9,19 +9,19 @@ mod meta;
 
 /// The main function to generate the output token stream from the parse IR.
 pub(crate) fn gen(input: ir::Input) -> TokenStream {
-    let partial_mod = gen_partial_mod(&input);
+    let layer_mod = gen_layer_mod(&input);
     let config_impl = gen_config_impl(&input);
 
     quote! {
         #config_impl
-        #partial_mod
+        #layer_mod
     }
 }
 
 /// Generates the `impl Config for ... { ... }`.
 fn gen_config_impl(input: &ir::Input) -> TokenStream {
     let name = &input.name;
-    let (partial_mod_name, partial_struct_name) = partial_names(&input.name);
+    let (layer_mod_name, layer_struct_name) = layer_names(&input.name);
 
     let field_names = input.fields.iter().map(|f| &f.name);
     let from_exprs = input.fields.iter().map(|f| {
@@ -31,17 +31,17 @@ fn gen_config_impl(input: &ir::Input) -> TokenStream {
             FieldKind::Nested { .. } => {
                 quote! {
                     confique::internal::map_err_prefix_path(
-                        confique::Config::from_partial(partial.#field_name),
+                        confique::Config::from_layer(layer.#field_name),
                         #path,
                     )?
                 }
             }
             FieldKind::Leaf { kind: LeafKind::Optional { .. }, .. } => {
-                quote! { partial.#field_name }
+                quote! { layer.#field_name }
             }
             FieldKind::Leaf { kind: LeafKind::Required { .. }, .. } => {
                 quote! {
-                    confique::internal::unwrap_or_missing_value_err(partial.#field_name, #path)?
+                    confique::internal::unwrap_or_missing_value_err(layer.#field_name, #path)?
                 }
             }
         }
@@ -58,9 +58,9 @@ fn gen_config_impl(input: &ir::Input) -> TokenStream {
     quote! {
         #[automatically_derived]
         impl confique::Config for #name {
-            type Partial = #partial_mod_name::#partial_struct_name;
+            type Layer = #layer_mod_name::#layer_struct_name;
 
-            fn from_partial(partial: Self::Partial) -> std::result::Result<Self, confique::Error> {
+            fn from_layer(layer: Self::Layer) -> std::result::Result<Self, confique::Error> {
                 let out = Self {
                     #( #field_names: #from_exprs, )*
                 };
@@ -73,9 +73,9 @@ fn gen_config_impl(input: &ir::Input) -> TokenStream {
     }
 }
 
-/// Generates the whole `mod ... { ... }` that defines the partial type and
+/// Generates the whole `mod ... { ... }` that defines the layer type and
 /// related items.
-fn gen_partial_mod(input: &ir::Input) -> TokenStream {
+fn gen_layer_mod(input: &ir::Input) -> TokenStream {
     // Iterate through all fields, collecting field-relevant parts to be sliced
     // in the various methods.
     let mut parts = Parts::default();
@@ -96,14 +96,14 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
     } = parts;
 
     // Prepare some values for interpolation
-    let (mod_name, struct_name) = partial_names(&input.name);
+    let (mod_name, struct_name) = layer_names(&input.name);
     let visibility = &input.visibility;
-    let partial_attrs = &input.partial_attrs;
+    let layer_attrs = &input.layer_attrs;
     let struct_visibility = inner_visibility(&input.visibility, Span::call_site());
     let module_doc = format!(
         "*Generated* by `confique`: helpers to implement `Config` for [`{}`].\n\
             \n\
-            Do not use directly! Only use via the `Config` and `Partial` traits \
+            Do not use directly! Only use via the `Config` and `Layer` traits \
             and what's explained in the confique documentation.
             Any other parts of this module cannot be relied on and are not part \
             of the semver guarantee of `confique`.",
@@ -118,13 +118,13 @@ fn gen_partial_mod(input: &ir::Input) -> TokenStream {
 
             #[derive(confique::serde::Deserialize)]
             #[serde(crate = "confique::serde")]
-            #( #[ #partial_attrs ])*
+            #( #[ #layer_attrs ])*
             #struct_visibility struct #struct_name {
                 #( #struct_fields )*
             }
 
             #[automatically_derived]
-            impl confique::Partial for #struct_name where #( #nested_bounds, )* {
+            impl confique::Layer for #struct_name where #( #nested_bounds, )* {
                 fn empty() -> Self {
                     Self {
                         #( #field_names: #empty_exprs, )*
@@ -192,20 +192,20 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
         // ----- Nested -------------------------------------------------------------
         FieldKind::Nested { ty } => {
             let ty_span = ty.span();
-            let field_ty = quote_spanned! {ty_span=> <#ty as confique::Config>::Partial };
-            let partial_attrs = &f.partial_attrs;
+            let field_ty = quote_spanned! {ty_span=> <#ty as confique::Config>::Layer };
+            let layer_attrs = &f.layer_attrs;
             let docs = &f.doc;
             parts.struct_fields.push(quote! {
-                #( #[ #partial_attrs ])*
+                #( #[ #layer_attrs ])*
                 #( #[ doc = #docs ] )*
-                #[serde(default = "confique::Partial::empty")]
+                #[serde(default = "confique::Layer::empty")]
                 #field_visibility #field_name: #field_ty,
             });
 
             parts.nested_bounds.push(quote! { #ty: confique::Config });
-            parts.empty_exprs.push(quote! { confique::Partial::empty() });
-            parts.default_exprs.push(quote! { confique::Partial::default_values() });
-            parts.from_env_exprs.push(quote! { confique::Partial::from_env()? });
+            parts.empty_exprs.push(quote! { confique::Layer::empty() });
+            parts.default_exprs.push(quote! { confique::Layer::default_values() });
+            parts.from_env_exprs.push(quote! { confique::Layer::from_env()? });
             parts.fallback_exprs.push(quote! {
                 self.#field_name.with_fallback(fallback.#field_name)
             });
@@ -320,11 +320,11 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
                 let main = quote_spanned! {field_name.span()=>
                     #field_visibility #field_name: Option<#inner_ty>,
                 };
-                let partial_attrs = &f.partial_attrs;
+                let layer_attrs = &f.layer_attrs;
                 let docs = &f.doc;
                 quote! {
                     #attr
-                    #( #[ #partial_attrs ])*
+                    #( #[ #layer_attrs ])*
                     #( #[ doc = #docs ] )*
                     #main
                 }
@@ -339,7 +339,7 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
                 parts.is_complete_exprs.push(quote! { self.#field_name.is_some() });
             }
 
-            // Code for `Partial::default_values()`
+            // Code for `Layer::default_values()`
             parts.default_exprs.push(match kind {
                 LeafKind::Required { default: Some(default), .. } => {
                     let msg = format!("default config value for `{qualified_name}` \
@@ -355,7 +355,7 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
                 _ => quote! { Option::None },
             });
 
-            // Code for `Partial::from_env()`
+            // Code for `Layer::from_env()`
             parts.from_env_exprs.push(match (env, parse_env) {
                 (None, _) => quote! { Option::None },
                 (Some(key), None) => quote! {
@@ -376,13 +376,13 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
     }
 }
 
-/// Returns the names of the module and struct for the partial type:
+/// Returns the names of the module and struct for the layer type:
 /// `(mod_name, struct_name)`.
-fn partial_names(original_name: &Ident) -> (Ident, Ident) {
+fn layer_names(original_name: &Ident) -> (Ident, Ident) {
     use heck::ToSnakeCase;
     (
-        format_ident!("confique_partial_{}", original_name.to_string().to_snake_case()),
-        format_ident!("Partial{original_name}"),
+        format_ident!("confique_{}_layer", original_name.to_string().to_snake_case()),
+        format_ident!("{original_name}Layer"),
     )
 }
 

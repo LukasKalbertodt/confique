@@ -3,7 +3,7 @@ use std::{collections::HashMap, net::IpAddr, path::PathBuf, convert::Infallible}
 use pretty_assertions::assert_eq;
 use serde::Deserialize;
 
-use confique::{meta, Config, Partial};
+use confique::{meta, Config, Layer};
 
 
 #[test]
@@ -47,7 +47,7 @@ fn simple() {
         ],
     });
 
-    let def = <Animals as Config>::Partial::default_values();
+    let def = <Animals as Config>::Layer::default_values();
     assert_eq!(def.cat, Some(8080));
     assert_eq!(def.dog, None);
 }
@@ -269,7 +269,7 @@ fn full() {
         ],
     });
 
-    let def = <Conf as Config>::Partial::default_values();
+    let def = <Conf as Config>::Layer::default_values();
     assert_eq!(def.app_name, None);
     assert_eq!(def.normal.required, None);
     assert_eq!(def.normal.with_default, Some(IpAddr::V4(std::net::Ipv4Addr::LOCALHOST)));

@@ -1,12 +1,12 @@
 use std::{ffi::OsStr, fs, io, path::PathBuf};
 
-use crate::{error::ErrorInner, Error, Partial};
+use crate::{error::ErrorInner, Error, Layer};
 
 
 /// A file as source for configuration.
 ///
 /// By default, the file is considered optional, meaning that on [`File::load`],
-/// if the file does not exist, [`Partial::empty()`][crate::Partial::empty] is
+/// if the file does not exist, [`Layer::empty()`][crate::Layer::empty] is
 /// returned.
 pub struct File {
     path: PathBuf,
@@ -46,8 +46,8 @@ impl File {
         self
     }
 
-    /// Attempts to load the file into the partial configuration `P`.
-    pub fn load<P: Partial>(&self) -> Result<P, Error> {
+    /// Attempts to load the file into the layer `L`.
+    pub fn load<L: Layer>(&self) -> Result<L, Error> {
         // Load file contents. If the file does not exist and was not marked as
         // required, we just return an empty layer.
         let file_content = match fs::read(&self.path) {
@@ -56,7 +56,7 @@ impl File {
                 if self.required {
                     return Err(ErrorInner::MissingRequiredFile { path: self.path.clone() }.into());
                 } else {
-                    return Ok(P::empty());
+                    return Ok(L::empty());
                 }
             }
             Err(e) => {

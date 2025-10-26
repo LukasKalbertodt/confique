@@ -160,7 +160,7 @@ log:
 ### [`figment`](https://crates.io/crates/figment)
 
 - Also based on `serde` and also uses your own structs as data store, thus type safe
-- Instead of using partial types, aggregates different layers in a dynamic data store
+- Instead of using layer types, aggregates different layers in a dynamic data store
 - If you need a "config template", you need to repeat code/docs
 
 ### Just `serde`?

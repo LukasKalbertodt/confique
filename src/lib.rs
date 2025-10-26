@@ -111,42 +111,42 @@
 //! ```
 //!
 //! But you can also assemble your configuration yourself. That's what
-//! the *partial* types are for (i.e. [`Config::Partial`]). These implement
+//! the *layer* types are for (i.e. [`Config::Layer`]). These implement
 //! `serde::Deserialize` and can thus be loaded from a vast number of sources.
 //! One of those sources is the built-in [`File`] which gives you a bit more
 //! control when loading configuration from files. And you can always simply
-//! create an instance of the partial type by writing all values in Rust code
+//! create an instance of the layer type by writing all values in Rust code
 //! with struct initializer syntax!
 //!
-//! Once you have all your layers (partial types) collected, you have to combine
-//! them via [`Partial::with_fallback`] and convert them to the actual config
-//! type via [`Config::from_partial`]. And you probably also want to use
-//! [`Partial::default_values`] as the last layer.
+//! Once you have all your layers collected, you have to combine
+//! them via [`Layer::with_fallback`] and convert them to the actual config
+//! type via [`Config::from_layer`]. And you probably also want to use
+//! [`Layer::default_values`] as the last layer.
 //!
 //! ```no_run
 //! # #[cfg(not(feature = "toml"))]
 //! # fn main() {}
 //! # #[cfg(feature = "toml")]
 //! # fn main() -> Result<(), confique::Error> {
-//! use confique::{Config, File, FileFormat, Partial};
+//! use confique::{Config, File, FileFormat, Layer};
 //!
 //! #[derive(Config)]
 //! struct Conf {
 //!     foo: f32,
 //! }
 //!
-//! type PartialConf = <Conf as Config>::Partial;
-//! let from_file: PartialConf = File::with_format("/etc/foo/config", FileFormat::Toml)
+//! type ConfLayer = <Conf as Config>::Layer;
+//! let from_file: ConfLayer = File::with_format("/etc/foo/config", FileFormat::Toml)
 //!     .required()
 //!     .load()?;
-//! let manual = PartialConf {
-//!     // Remember: all fields in the partial types are `Option`s!
+//! let manual = ConfLayer {
+//!     // Remember: all fields in the layer types are `Option`s!
 //!     foo: Some(3.14),
 //! };
-//! let defaults = PartialConf::default_values();
+//! let defaults = ConfLayer::default_values();
 //!
 //! let merged = from_file.with_fallback(manual).with_fallback(defaults);
-//! let config = Conf::from_partial(merged)?;
+//! let config = Conf::from_layer(merged)?;
 //! # Ok(())
 //! # }
 //! ```
@@ -305,7 +305,7 @@ pub use crate::{
 /// ```
 ///
 /// Sets a default value for this field. This is returned by
-/// [`Partial::default_values`] and, in most circumstances, used as a
+/// [`Layer::default_values`] and, in most circumstances, used as a
 /// last "layer" to pull values from that have not been set in a layer of
 /// higher-priority. Currently, the following expressions are allowed:
 ///
@@ -341,7 +341,7 @@ pub use crate::{
 /// #[config(env = "KEY")]
 /// ```
 ///
-/// Assigns an environment variable to this field. In [`Partial::from_env`], the
+/// Assigns an environment variable to this field. In [`Layer::from_env`], the
 /// variable is checked and deserialized into the field if present.
 ///
 /// If the env var is set to an empty string and if the field fails to
@@ -462,7 +462,7 @@ pub use crate::{
 ///
 /// Adds a validation to the config struct, i.e. a check that must suceed to be
 /// able to load the configuration. The validator is called inside
-/// `Config::from_partial`, i.e. only after all layers have been merged.
+/// `Config::from_layer`, i.e. only after all layers have been merged.
 ///
 /// The given`path::to::function` is expected to be a function callable as
 /// `Fn(&T) -> Result<(), E>` where `T` is the struct type (`Self`) and `E` can
@@ -489,15 +489,15 @@ pub use crate::{
 /// # fn main() {}
 /// ```
 ///
-/// ### `partial_attr`
+/// ### `layer_attr`
 ///
 /// ```ignore
-/// #[config(partial_attr(...))]
+/// #[config(layer_attr(...))]
 /// ```
 ///
-/// Specify attributes that should be attached to the partial struct definition.
-/// For example, `#[config(partial_attr(derive(Clone)))]` can be used to make
-/// the partial type implement `Clone`.
+/// Specify attributes that should be attached to the layer struct definition.
+/// For example, `#[config(layer_attr(derive(Clone)))]` can be used to make
+/// the layer type implement `Clone`.
 ///
 /// This attribute can also be applied to struct fields.
 ///
@@ -505,9 +505,8 @@ pub use crate::{
 /// # What the macro generates
 ///
 /// This macro emits one `impl confique::Config for … { … }` block. But in order
-/// to implement that trait, a *partial type* of your struct is also generated.
-/// That partial type lives in its own module and derives
-/// `serde::Deserialize`.
+/// to implement that trait, a *layer type* of your struct is also generated.
+/// That layer type lives in its own module and derives `serde::Deserialize`.
 ///
 /// The example in the "Quick example" section above would expand to something
 /// like this:
@@ -515,35 +514,35 @@ pub use crate::{
 /// ```ignore
 /// // ----- Generated for `Conf` -----
 /// impl confique::Config for Conf {
-///     type Partial = confique_partial_conf::PartialConf;
+///     type Layer = confique_conf_layer::ConfLayer;
 ///     ...
 /// }
-/// mod confique_partial_conf {
+/// mod confique_conf_layer {
 ///     #[derive(serde::Deserialize)]
-///     pub(super) struct PartialConf {
+///     pub(super) struct ConfLayer {
 ///         pub(super) color: Option<String>,
 ///
-///         #[serde(default = "confique::Partial::empty")]
-///         pub(super) http: <HttpConf as confique::Config>::Partial,
+///         #[serde(default = "confique::Layer::empty")]
+///         pub(super) http: <HttpConf as confique::Config>::Layer,
 ///     }
 ///
-///     impl confique::Partial for PartialConf { ... }
+///     impl confique::Layer for ConfLayer { ... }
 /// }
 ///
 /// // ----- Generated for `HttpConf` -----
 /// impl confique::Config for HttpConf {
-///     type Partial = confique_partial_http_conf::PartialHttpConf;
+///     type Layer = confique_http_conf_layer::HttpConfLayer;
 ///     ...
 /// }
-/// mod confique_partial_http_conf {
+/// mod confique_http_conf_layer {
 ///     #[derive(serde::Deserialize)]
-///     pub(super) struct PartialHttpConf {
+///     pub(super) struct HttpConfLayer {
 ///         pub(super) port: Option<u16>,
 ///         pub(super) bind: Option<IpAddr>,
 ///         pub(super) headers: Option<Vec<String>>,
 ///     }
 ///
-///     impl confique::Partial for PartialHttpConf { ... }
+///     impl confique::Layer for HttpConfLayer { ... }
 /// }
 /// ```
 pub use confique_macro::Config;
@@ -562,7 +561,7 @@ pub use confique_macro::Config;
 /// repeat yourself" principle. See [the documentation of the derive
 /// macro][macro@Config] for more information!
 pub trait Config: Sized {
-    /// A version of `Self` that represents a potetially partial configuration.
+    /// A layer of `Self` (a potentially partial configuration).
     ///
     /// This type is supposed to have the exact same fields as this one, but
     /// with every field being optional. Its main use is to have a layered
@@ -570,7 +569,7 @@ pub trait Config: Sized {
     /// all required values. The only thing that matters is that combining all
     /// layers will result in a configuration object that has all required
     /// values defined.
-    type Partial: Partial;
+    type Layer: Layer;
 
     /// A description of this configuration.
     ///
@@ -578,13 +577,12 @@ pub trait Config: Sized {
     /// configuration type.
     const META: meta::Meta;
 
-    /// Tries to create `Self` from a potentially partial object and validates
-    /// itself.
+    /// Tries to create `Self` from a layer and validates itself.
     ///
     /// An [`Error`] is returned if:
-    /// - any required values are not defined in `partial`, or
+    /// - any required values are not defined in `layer`, or
     /// - the struct validation fails (see `validate` attribute on derive macro)
-    fn from_partial(partial: Self::Partial) -> Result<Self, Error>;
+    fn from_layer(layer: Self::Layer) -> Result<Self, Error>;
 
     /// Convenience builder to configure, load and merge multiple configuration
     /// sources. **Sources specified earlier have a higher priority**; later
@@ -644,19 +642,19 @@ pub trait Config: Sized {
     /// ```
     #[cfg(any(feature = "toml", feature = "yaml", feature = "json5"))]
     fn from_file(path: impl Into<std::path::PathBuf>) -> Result<Self, Error> {
-        let default_values = Self::Partial::default_values();
+        let default_values = Self::Layer::default_values();
         let mut file = File::new(path)?;
         if !default_values.is_complete() {
             file = file.required();
         }
 
-        Self::from_partial(file.load::<Self::Partial>()?.with_fallback(default_values))
+        Self::from_layer(file.load::<Self::Layer>()?.with_fallback(default_values))
     }
 }
 
-/// A potentially partial configuration object that can be directly deserialized
+/// A configuration layer: all fields are optional. Can be directly deserialized
 /// via `serde`.
-pub trait Partial: for<'de> Deserialize<'de> {
+pub trait Layer: for<'de> Deserialize<'de> {
     /// Returns `Self` where all fields/values are `None` or empty.
     fn empty() -> Self;
 
@@ -675,17 +673,16 @@ pub trait Partial: for<'de> Deserialize<'de> {
     /// if it fails to deserialize, it's treated as not set.
     fn from_env() -> Result<Self, Error>;
 
-    /// Combines two partial configuration objects. `self` has a higher
-    /// priority; missing values in `self` are filled with values in `fallback`,
-    /// if they exist. The semantics of this method is basically like in
-    /// [`Option::or`].
+    /// Combines two layers. `self` has a higher priority; missing values in
+    /// `self` are filled with values in `fallback`, if they exist. The
+    /// semantics of this method is basically like in [`Option::or`].
     fn with_fallback(self, fallback: Self) -> Self;
 
     /// Returns `true` if all values are unspecified/`None`.
     fn is_empty(&self) -> bool;
 
     /// Returns `true` if all required (non-optional) values in this
-    /// configuration are set. If this returns `true`, `Config::from_partial`
+    /// configuration are set. If this returns `true`, [`Config::from_layer`]
     /// will not return an error.
     fn is_complete(&self) -> bool;
 }

@@ -1,5 +1,5 @@
 use serde::Deserialize;
-use confique::{Config, Partial};
+use confique::{Config, Layer};
 use pretty_assertions::assert_eq;
 
 #[derive(Debug, Deserialize)]
@@ -34,7 +34,7 @@ fn my_parser2(s: &str) -> Result<u32, impl std::error::Error> {
 #[test]
 fn empty_error_is_unset() {
     #[derive(Config)]
-    #[config(partial_attr(derive(PartialEq, Debug)))]
+    #[config(layer_attr(derive(PartialEq, Debug)))]
     #[allow(dead_code)]
     struct Conf {
         #[config(env = "EMPTY_ERROR_IS_UNSET_FOO")]
@@ -57,10 +57,10 @@ fn empty_error_is_unset() {
         validate_parse: u32,
     }
 
-    type Partial = <Conf as Config>::Partial;
+    type Layer = <Conf as Config>::Layer;
 
     std::env::set_var("EMPTY_ERROR_IS_UNSET_FOO", "");
-    assert_eq!(Partial::from_env().unwrap(), Partial {
+    assert_eq!(Layer::from_env().unwrap(), Layer {
         foo: None,
         bar: None,
         baz: None,
@@ -69,7 +69,7 @@ fn empty_error_is_unset() {
     });
 
     std::env::set_var("EMPTY_ERROR_IS_UNSET_BAR", "");
-    assert_eq!(Partial::from_env().unwrap(), Partial {
+    assert_eq!(Layer::from_env().unwrap(), Layer {
         foo: None,
         bar: None,
         baz: None,
@@ -78,7 +78,7 @@ fn empty_error_is_unset() {
     });
 
     std::env::set_var("EMPTY_ERROR_IS_UNSET_BAZ", "");
-    assert_eq!(Partial::from_env().unwrap(), Partial {
+    assert_eq!(Layer::from_env().unwrap(), Layer {
         foo: None,
         bar: None,
         baz: Some("".into()),
@@ -87,7 +87,7 @@ fn empty_error_is_unset() {
     });
 
     std::env::set_var("EMPTY_ERROR_IS_UNSET_VALIDATE", "");
-    assert_eq!(Partial::from_env().unwrap(), Partial {
+    assert_eq!(Layer::from_env().unwrap(), Layer {
         foo: None,
         bar: None,
         baz: Some("".into()),
@@ -96,7 +96,7 @@ fn empty_error_is_unset() {
     });
 
     std::env::set_var("EMPTY_ERROR_IS_UNSET_VALIDATE_PARSE", "");
-    assert_eq!(Partial::from_env().unwrap(), Partial {
+    assert_eq!(Layer::from_env().unwrap(), Layer {
         foo: None,
         bar: None,
         baz: Some("".into()),

@@ -7,7 +7,7 @@ use proc_macro2::TokenStream;
 pub(crate) struct Input {
     pub(crate) doc: Vec<String>,
     pub(crate) visibility: syn::Visibility,
-    pub(crate) partial_attrs: Vec<TokenStream>,
+    pub(crate) layer_attrs: Vec<TokenStream>,
     pub(crate) validate: Option<syn::Path>,
     pub(crate) name: syn::Ident,
     pub(crate) fields: Vec<Field>,
@@ -17,7 +17,7 @@ pub(crate) struct Field {
     pub(crate) doc: Vec<String>,
     pub(crate) name: syn::Ident,
     pub(crate) kind: FieldKind,
-    pub(crate) partial_attrs: Vec<TokenStream>
+    pub(crate) layer_attrs: Vec<TokenStream>
 
     // TODO:
     // - serde attributes

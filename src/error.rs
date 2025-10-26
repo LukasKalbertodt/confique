@@ -32,7 +32,7 @@ impl Error {
     allow(dead_code)
 )]
 pub(crate) enum ErrorInner {
-    /// Returned by `Config::from_partial` when the partial does not contain
+    /// Returned by `Config::from_layer` when the layer does not contain
     /// values for all required configuration values. The string is a
     /// human-readable path to the value, e.g. `http.port`.
     MissingValue(String),

@@ -15,7 +15,7 @@ struct Conf {
 
 /// Configuring the HTTP server of our app.
 #[derive(Debug, Config)]
-#[config(partial_attr(derive(Clone)))]
+#[config(layer_attr(derive(Clone)))]
 struct Http {
     /// The port the server will listen on.
     #[config(env = "PORT")]

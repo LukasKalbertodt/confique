@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 
 ## [Unreleased]
+- **Breaking**: rename `Partial` to `Layer` (including `from_partial` -> `from_layer`, `partial_attr` -> `layer_attr`, and more).
+  - The new name more accurately reflects how the type is used most of the time. It is also less awkward to read/use as unlike "partial", "layer" is a proper noun.
 - **Breaking**: require the (unresolved) symbol `Option` to be in scope and refer to `std::option::Option` where `derive(Config)` is used.
   - While technically breaking, this is unlikely to affect anyone, since hardly any Rust code shadows `Option`.
   - This change allows `confique` to emit just `Option` for the partial type, which in turn enables you to use other derives with it (e.g. `clap`).

@@ -32,7 +32,7 @@ impl Input {
         Ok(Self {
             doc,
             visibility: input.vis,
-            partial_attrs: attrs.partial_attrs,
+            layer_attrs: attrs.layer_attrs,
             validate: attrs.validate,
             name: input.ident,
             fields,
@@ -44,12 +44,12 @@ impl Input {
 
 #[derive(Default)]
 struct StructAttrs {
-    partial_attrs: Vec<TokenStream>,
+    layer_attrs: Vec<TokenStream>,
     validate: Option<syn::Path>,
 }
 
 enum StructAttr {
-    PartialAttrs(TokenStream),
+    LayerAttr(TokenStream),
     Validate(syn::Path),
 }
 
@@ -75,7 +75,7 @@ impl StructAttrs {
                 }
 
                 match parsed {
-                    StructAttr::PartialAttrs(tokens) => out.partial_attrs.push(tokens),
+                    StructAttr::LayerAttr(tokens) => out.layer_attrs.push(tokens),
                     StructAttr::Validate(path) => {
                         duplicate_if!(out.validate.is_some());
                         out.validate = Some(path);
@@ -91,7 +91,7 @@ impl StructAttrs {
 impl StructAttr {
     fn keyword(&self) -> &'static str {
         match self {
-            Self::PartialAttrs(_) => "partial_attr",
+            Self::LayerAttr(_) => "layer_attr",
             Self::Validate(_) => "validate",
         }
     }
@@ -101,9 +101,9 @@ impl Parse for StructAttr {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let ident: Ident = input.parse()?;
         match &*ident.to_string() {
-            "partial_attr" => {
-                let partial_stream = parse_partial_attr(input)?;
-                Ok(Self::PartialAttrs(partial_stream))
+            "layer_attr" => {
+                let stream = parse_layer_attr(input)?;
+                Ok(Self::LayerAttr(stream))
             }
             "validate" => parse_eq_value(input).map(Self::Validate),
             _ => Err(syn::Error::new(ident.span(), "unknown confique attribute")),
@@ -172,7 +172,7 @@ impl Field {
             doc,
             name: field.ident.expect("bug: expected named field"),
             kind,
-            partial_attrs: attrs.partial_attrs
+            layer_attrs: attrs.layer_attrs
         })
     }
 }
@@ -188,7 +188,7 @@ struct FieldAttrs {
     deserialize_with: Option<syn::Path>,
     parse_env: Option<syn::Path>,
     validate: Vec<FieldValidator>,
-    partial_attrs: Vec<TokenStream>,
+    layer_attrs: Vec<TokenStream>,
 }
 
 enum FieldAttr {
@@ -198,7 +198,7 @@ enum FieldAttr {
     DeserializeWith(syn::Path),
     ParseEnv(syn::Path),
     Validate(FieldValidator),
-    PartialAttr(TokenStream),
+    LayerAttr(TokenStream),
 }
 
 impl FieldAttrs {
@@ -246,8 +246,8 @@ impl FieldAttrs {
                     FieldAttr::Validate(validator) => {
                         out.validate.push(validator);
                     }
-                    FieldAttr::PartialAttr(partial_attr) => {
-                        out.partial_attrs.push(partial_attr);
+                    FieldAttr::LayerAttr(layer_attr) => {
+                        out.layer_attrs.push(layer_attr);
                     }
                 }
             }
@@ -266,7 +266,7 @@ impl FieldAttr {
             Self::ParseEnv(_) => "parse_env",
             Self::DeserializeWith(_) => "deserialize_with",
             Self::Validate(_) => "validate",
-            Self::PartialAttr(_) => "partial_attr",
+            Self::LayerAttr(_) => "layer_attr",
         }
     }
 }
@@ -335,9 +335,9 @@ impl Parse for FieldAttr {
                     ))
                 }
             }
-            "partial_attr" => {
-                let partial_stream = parse_partial_attr(input)?;
-                Ok(Self::PartialAttr(partial_stream))
+            "layer_attr" => {
+                let layer_stream = parse_layer_attr(input)?;
+                Ok(Self::LayerAttr(layer_stream))
             }
 
             _ => Err(syn::Error::new(ident.span(), "unknown confique attribute")),
@@ -407,7 +407,7 @@ impl Parse for MapKey {
 
 // ===== Util =====================================================================
 
-fn parse_partial_attr(input: &ParseBuffer<'_>) -> syn::Result<TokenStream> {
+fn parse_layer_attr(input: &ParseBuffer<'_>) -> syn::Result<TokenStream> {
     let g: Group = input.parse()?;
     if g.delimiter() != Delimiter::Parenthesis {
         return Err(Error::new_spanned(g,
