@@ -24,6 +24,10 @@ required-features = ["toml", "yaml"]
 name = "validate"
 required-features = ["toml"]
 
+[[example]]
+name = "clap"
+required-features = ["toml", "yaml"]
+
 [[test]]
 name = "indirect-serde"
 path = "tests/indirect-serde/run.rs"
@@ -47,8 +51,9 @@ serde_yaml = { version = "0.9.0", optional = true }
 toml = { version = "0.9.0", optional = true }
 
 [dev-dependencies]
-pretty_assertions = "1.2.1"
+clap = { version = "4.5.0", features = ["derive"] }
 derive_more = { version = "2.0.1", features = ["debug", "display", "deref"] }
+pretty_assertions = "1.2.1"
 
 
 [package.metadata.docs.rs]

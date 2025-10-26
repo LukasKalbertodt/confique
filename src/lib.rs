@@ -157,6 +157,11 @@
 //! of your struct. And you already know how to access fields of structs!
 //!
 //!
+//! # Other notes
+//!
+//! - To use CLI as a layer when loading your configuration, see the `clap`
+//!   example!
+//!
 //! # Cargo features
 //!
 //! This crate has a Cargo feature for each supported file format. These are not
