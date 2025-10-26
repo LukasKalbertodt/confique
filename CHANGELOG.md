@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 - Forward field docs to layer type. This is especially useful when using derives on the layer, which read the docs.
 - Add examples `clap` and `builder`, showing how you can derive useful traits for the layer type.
 - Add clarification about `Config` vs `Deserialize` to the docs.
+- (Technically breaking) Remove implicit crate feature `serde_yaml`. Use `yaml` instead!
 
 ## [0.3.1] - 2025-07-26
 - Allow `#[config(partial_attr(...))]` on fields (thanks @aschey, in [#44](https://github.com/LukasKalbertodt/confique/pull/44))

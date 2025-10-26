@@ -40,7 +40,7 @@ required-features = ["toml"]
 
 [features]
 default = []
-yaml = ["serde_yaml"]
+yaml = ["dep:serde_yaml"]
 
 
 [dependencies]
