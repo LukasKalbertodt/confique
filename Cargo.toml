@@ -18,7 +18,7 @@ exclude = [".github"]
 
 [[example]]
 name = "simple"
-required-features = ["toml"]
+required-features = ["toml", "yaml"]
 
 [[example]]
 name = "validate"
