@@ -82,6 +82,9 @@
 //! With `#[config(validate = ...)]` you can add validation checks. For more
 //! information, see the [docs for the derive macro][macro@Config].
 //!
+//! Note: if a field hast `#[config(nested)]`, its type must implement
+//! [`Config`], otherwise it must implement `serde::Deserialize`.
+//!
 //!
 //! ## Loading the configuration
 //!
