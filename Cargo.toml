@@ -3,7 +3,7 @@ name = "confique"
 version = "0.3.1"
 authors = ["Lukas Kalbertodt <lukas.kalbertodt@gmail.com>"]
 edition = "2021"
-rust-version = "1.61.0"
+rust-version = "1.68.2"
 
 description = "Type-safe, layered, light-weight, `serde`-based configuration library"
 documentation = "https://docs.rs/confique/"
