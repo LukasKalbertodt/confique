@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 
 ## [Unreleased]
+
+## [0.4.0] - 2025-10-27
 - **Breaking**: rename `Partial` to `Layer` (including `from_partial` -> `from_layer`, `partial_attr` -> `layer_attr`, and more).
   - The new name more accurately reflects how the type is used most of the time. It is also less awkward to read/use as unlike "partial", "layer" is a proper noun.
 - **Breaking**: require the (unresolved) symbol `Option` to be in scope and refer to `std::option::Option` where `derive(Config)` is used.
@@ -140,7 +142,8 @@ All notable changes to this project will be documented in this file.
 - Everything.
 
 
-[Unreleased]: https://github.com/LukasKalbertodt/confique/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/LukasKalbertodt/confique/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/LukasKalbertodt/confique/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/LukasKalbertodt/confique/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/LukasKalbertodt/confique/compare/v0.2.6...v0.3.0
 [0.2.6]: https://github.com/LukasKalbertodt/confique/compare/v0.2.5...v0.2.6
