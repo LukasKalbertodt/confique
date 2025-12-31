@@ -195,7 +195,7 @@ pub mod meta;
 mod file;
 
 #[cfg(any(feature = "toml", feature = "yaml", feature = "json5"))]
-mod template;
+mod format;
 
 #[cfg(feature = "json5")]
 pub mod json5;
@@ -219,7 +219,7 @@ pub use self::{
 #[cfg(any(feature = "toml", feature = "yaml", feature = "json5"))]
 pub use crate::{
     file::{File, FileFormat},
-    template::FormatOptions,
+    format::FormatOptions,
 };
 
 
