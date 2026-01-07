@@ -92,11 +92,12 @@ pub(crate) trait Formatter {
 /// General (non format-dependent) template-formatting options.
 #[non_exhaustive]
 pub struct FormatOptions {
-    /// Whether to include doc comments (with your own text and information
-    /// about whether a value is required and/or has a default). Default:
+    /// Whether to include doc comments (with your own text). Default:
     /// `true`.
     pub comments: bool,
-
+    /// If to include information about whether a value is required and/or has a default). Default:
+    /// `true`.
+    pub include_default_or_required_comment: bool,
     /// If `comments` and this field are `true`, leaf fields with `env = "FOO"`
     /// attribute will have a line like this added:
     ///
@@ -134,6 +135,7 @@ impl Default for FormatOptions {
     fn default() -> Self {
         Self {
             comments: true,
+            include_default_or_required_comment: true,
             env_keys: true,
             leaf_field_gap: None,
             nested_field_gap: 1,
@@ -197,7 +199,7 @@ fn format_impl(out: &mut impl Formatter, meta: &Meta, options: &FormatOptions) {
             LeafKind::Optional => out.disabled_field(field.name, None),
             LeafKind::Required { default } => {
                 // Emit comment about default value or the value being required.
-                if options.comments {
+                if options.include_default_or_required_comment {
                     empty_sep_doc_line!();
                     out.default_or_required_comment(default.as_ref())
                 }
