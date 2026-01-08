@@ -141,7 +141,7 @@ impl Formatter for Json5Formatter {
 
     fn field(&mut self, name: &'static str, value: &'static Expr) {
         self.emit_indentation();
-let value = PrintExpr(value);
+        let value = PrintExpr(value);
         writeln!(self.buffer, "{}", format_args!("{name}: {value},")).unwrap();
     }
 

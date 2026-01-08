@@ -126,7 +126,7 @@ pub struct FormatOptions {
     ///
     /// Default: 1.
     pub nested_field_gap: u8,
-    
+
     // Potential future options:
     // - Which docs to include from nested objects
 }
@@ -212,12 +212,8 @@ fn format_impl(out: &mut impl Formatter, meta: &Meta, options: &FormatOptions) {
                 }
 
                 // Emit the actual line with the name and optional value
-                if let Some(default_value) = default {
-                if options.comment_out_default_values {
-                    out.disabled_field(field.name, default.as_ref());
-                } else {
-                        out.field(field.name, default_value); 
-                    }
+                if !options.comment_out_default_values && let Some(default_value) = default {
+                    out.field(field.name, default_value); 
                 } else {
                     out.disabled_field(field.name, default.as_ref());
                 }
