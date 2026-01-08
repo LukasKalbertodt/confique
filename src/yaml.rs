@@ -132,6 +132,12 @@ impl Formatter for YamlFormatter {
         writeln!(self.buffer, "#{comment}").unwrap();
     }
 
+    fn field(&mut self, name: &'static str, value: &'static Expr) {
+        self.emit_indentation();
+        let value = PrintExpr(value);
+        writeln!(self.buffer, "{name}: {value}").unwrap();
+    }
+
     fn disabled_field(&mut self, name: &str, value: Option<&'static Expr>) {
         match value.map(PrintExpr) {
             None => self.comment(format_args!("{name}:")),

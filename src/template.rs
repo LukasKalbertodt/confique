@@ -27,6 +27,9 @@ pub(crate) trait Formatter {
     /// your comment token.
     fn comment(&mut self, comment: impl fmt::Display);
 
+    /// Write a prepopulated field with a value, e.g. `format!("{name} = {value}")`.
+    fn field(&mut self, name: &'static str, value: &'static Expr);
+
     /// Write a commented-out field with optional value, e.g. `format!("#{name} = {value}")`.
     fn disabled_field(&mut self, name: &'static str, value: Option<&'static Expr>);
 
@@ -92,12 +95,18 @@ pub(crate) trait Formatter {
 /// General (non format-dependent) template-formatting options.
 #[non_exhaustive]
 pub struct FormatOptions {
-    /// Whether to include doc comments (with your own text). Default:
-    /// `true`.
+    /// Whether to include doc comments (with your own text).
+    ///
+    /// Default: `true`.
     pub comments: bool,
-    /// If to include information about whether a value is required and/or has a default). Default:
-    /// `true`.
+    /// If to include information about whether a value is required and/or has a default).
+    ///
+    /// Default: `true`.
     pub include_default_or_required_comment: bool,
+    /// Whether to comment out default values (f.e. `#foo = 3` vs. `foo = 3`).
+    ///
+    /// Default: `true`
+    pub comment_out_default_values: bool,
     /// If `comments` and this field are `true`, leaf fields with `env = "FOO"`
     /// attribute will have a line like this added:
     ///
@@ -107,21 +116,18 @@ pub struct FormatOptions {
     ///
     /// Default: `true`.
     pub env_keys: bool,
-
     /// Number of lines between leaf fields. Gap between leaf and nested fields
     /// is the bigger of this and `nested_field_gap`.
     ///
     /// Default: `if self.comments { 1 } else { 0 }`.
     pub leaf_field_gap: Option<u8>,
-
     /// Number of lines between nested fields. Gap between leaf and nested
     /// fields is the bigger of this and `leaf_field_gap`.
     ///
     /// Default: 1.
     pub nested_field_gap: u8,
-
+    
     // Potential future options:
-    // - Comment out default values (`#foo = 3` vs `foo = 3`)
     // - Which docs to include from nested objects
 }
 
@@ -136,6 +142,7 @@ impl Default for FormatOptions {
         Self {
             comments: true,
             include_default_or_required_comment: true,
+            comment_out_default_values: true,
             env_keys: true,
             leaf_field_gap: None,
             nested_field_gap: 1,
@@ -205,7 +212,15 @@ fn format_impl(out: &mut impl Formatter, meta: &Meta, options: &FormatOptions) {
                 }
 
                 // Emit the actual line with the name and optional value
-                out.disabled_field(field.name, default.as_ref());
+                if let Some(default_value) = default {
+                if options.comment_out_default_values {
+                    out.disabled_field(field.name, default.as_ref());
+                } else {
+                        out.field(field.name, default_value); 
+                    }
+                } else {
+                    out.disabled_field(field.name, default.as_ref());
+                }
             }
         }
     }
