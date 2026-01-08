@@ -206,17 +206,16 @@ fn format_impl(out: &mut impl Formatter, meta: &Meta, options: &FormatOptions) {
             LeafKind::Optional => out.disabled_field(field.name, None),
             LeafKind::Required { default } => {
                 // Emit comment about default value or the value being required.
-                if options.include_default_or_required_comment {
+                if options.include_default_or_required_comment && options.comments {
                     empty_sep_doc_line!();
                     out.default_or_required_comment(default.as_ref())
                 }
 
                 // Emit the actual line with the name and optional value
-                if !options.comment_out_default_values && let Some(default_value) = default {
-                    out.field(field.name, default_value); 
-                } else {
-                    out.disabled_field(field.name, default.as_ref());
-                }
+                match default {
+                    Some(ref default_value) if !options.comment_out_default_values => out.field(field.name, default_value),
+                    _ => out.disabled_field(field.name, default.as_ref())
+}
             }
         }
     }
