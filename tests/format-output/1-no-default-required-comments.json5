@@ -1,0 +1,41 @@
+// A sample configuration for our app.
+{
+  // Name of the website.
+  //site_name: ,
+
+  // Configurations related to the HTTP communication.
+  http: {
+    // The port the server will listen on.
+    //
+    // Can also be specified via environment variable `PORT`.
+    //port: ,
+
+    // The bind address of the server. Can be set to `0.0.0.0` for example, to
+    // allow other users of the network to access the server.
+    //bind: "127.0.0.1",
+
+    headers: {
+      // The header in which the reverse proxy specifies the username.
+      //username: "x-username",
+
+      // The header in which the reverse proxy specifies the display name.
+      //display_name: "x-display-name",
+
+      // Headers that are allowed.
+      //allowed: ["content-type","content-encoding"],
+
+      // Assigns a score to some headers.
+      //score: {"cookie":1.5,"server":12.7},
+    },
+  },
+
+  // Configuring the logging.
+  log: {
+    // If set to `true`, the app will log to stdout.
+    //stdout: true,
+
+    // If this is set, the app will write logs to the given file. Of course,
+    // the app has to have write access to that file.
+    //file: ,
+  },
+}

@@ -225,6 +225,14 @@ mod tests {
     }
 
     #[test]
+    fn no_default_or_required_comment() {
+        let mut options = FormatOptions::default();
+        options.general.include_default_or_required_comment = false;
+        let out = template::<test_utils::example1::Conf>(options);
+        assert_str_eq!(&out, include_format_output!("1-no-default-required-comments.json5"));
+    }
+
+    #[test]
     fn immediately_nested() {
         let out = template::<test_utils::example2::Conf>(Default::default());
         assert_str_eq!(&out, include_format_output!("2-default.json5"));
