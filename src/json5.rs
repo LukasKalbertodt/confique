@@ -4,12 +4,10 @@
 use std::fmt::{self, Write};
 
 use crate::{
-    Config,
-    template::{self, Formatter},
     meta::Expr,
+    template::{self, Formatter},
+    Config,
 };
-
-
 
 /// Options for generating a JSON5 template.
 #[non_exhaustive]
@@ -139,6 +137,12 @@ impl Formatter for Json5Formatter {
         writeln!(self.buffer, "//{comment}").unwrap();
     }
 
+    fn field(&mut self, name: &'static str, value: &'static Expr) {
+        self.emit_indentation();
+        let value = PrintExpr(value);
+        writeln!(self.buffer, "{}", format_args!("{name}: {value},")).unwrap();
+    }
+
     fn disabled_field(&mut self, name: &str, value: Option<&'static Expr>) {
         match value.map(PrintExpr) {
             None => self.comment(format_args!("{name}: ,")),
@@ -210,6 +214,22 @@ mod tests {
         options.general.comments = false;
         let out = template::<test_utils::example1::Conf>(options);
         assert_str_eq!(&out, include_format_output!("1-no-comments.json5"));
+    }
+
+    #[test]
+    fn uncommented_default() {
+        let mut options = FormatOptions::default();
+        options.general.comment_out_default_values = false;
+        let out = template::<test_utils::example1::Conf>(options);
+        assert_str_eq!(&out, include_format_output!("1-uncommented-defaults.json5"));
+    }
+
+    #[test]
+    fn no_default_or_required_comment() {
+        let mut options = FormatOptions::default();
+        options.general.include_default_or_required_comment = false;
+        let out = template::<test_utils::example1::Conf>(options);
+        assert_str_eq!(&out, include_format_output!("1-no-default-required-comments.json5"));
     }
 
     #[test]

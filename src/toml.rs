@@ -130,6 +130,12 @@ impl Formatter for TomlFormatter {
         writeln!(self.buffer, "#{comment}").unwrap();
     }
 
+    fn field(&mut self, name: &'static str, value: &'static Expr) {
+        self.emit_indentation();
+        let value = PrintExpr(value);
+        writeln!(self.buffer, "{name} = {value}").unwrap();
+    }
+
     fn disabled_field(&mut self, name: &str, value: Option<&'static Expr>) {
         match value.map(PrintExpr) {
             None => self.comment(format_args!("{name} =")),
@@ -231,6 +237,22 @@ mod tests {
         options.general.comments = false;
         let out = template::<test_utils::example1::Conf>(options);
         assert_str_eq!(&out, include_format_output!("1-no-comments.toml"));
+    }
+
+    #[test]
+    fn uncommented_default() {
+        let mut options = FormatOptions::default();
+        options.general.comment_out_default_values = false;
+        let out = template::<test_utils::example1::Conf>(options);
+        assert_str_eq!(&out, include_format_output!("1-uncommented-defaults.toml"));
+    }
+
+    #[test]
+    fn no_default_or_required_comment() {
+        let mut options = FormatOptions::default();
+        options.general.include_default_or_required_comment = false;
+        let out = template::<test_utils::example1::Conf>(options);
+        assert_str_eq!(&out, include_format_output!("1-no-default-required-comments.toml"));
     }
 
     #[test]
