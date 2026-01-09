@@ -252,6 +252,14 @@ mod tests {
     }
 
     #[test]
+    fn uncommented_default() {
+        let mut options = FormatOptions::default();
+        options.general.comment_out_default_values = false;
+        let out = template::<test_utils::example1::Conf>(options);
+        assert_str_eq!(&out, include_format_output!("1-uncommented-defaults.yaml"));
+    }
+
+    #[test]
     fn immediately_nested() {
         let out = template::<test_utils::example2::Conf>(Default::default());
         assert_str_eq!(&out, include_format_output!("2-default.yaml"));
