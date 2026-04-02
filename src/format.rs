@@ -23,16 +23,24 @@ pub(crate) trait ConfigFormatter {
     fn comment(&mut self, comment: impl fmt::Display);
 
     /// Write an enabled field with a value.
-    fn field(&mut self, name: &'static str, value: &str);
+    fn field(&mut self, name: &str, value: &str);
 
     /// Write a disabled (commented-out) field with an optional value.
-    fn disabled_field(&mut self, name: &'static str, value: Option<&str>);
+    fn disabled_field(&mut self, name: &str, value: Option<&str>);
 
     /// Start a nested configuration section with the given name.
-    fn start_nested(&mut self, name: &'static str, doc: &[&'static str]);
+    fn start_nested(&mut self, name: &str, doc: &[&str]);
 
     /// End a nested configuration section.
     fn end_nested(&mut self);
+
+    /// Push a path segment without emitting a section header.
+    /// Used for table-of-tables rendering where the parent key must be part
+    /// of the path but should not produce its own header.
+    fn push_path(&mut self, _name: &str) {}
+
+    /// Pop a path segment previously pushed by [`push_path`].
+    fn pop_path(&mut self) {}
 
     /// Called after the global docs are written and before any fields are
     /// emitted. Default impl does nothing.
@@ -116,6 +124,20 @@ pub(crate) trait ValueAccess {
     fn is_null(&self) -> bool {
         false
     }
+
+    /// Returns the entries of a table value as `(key, value)` pairs.
+    /// Returns `None` if this value is not a table.
+    fn table_entries(&self) -> Option<Vec<(&str, &Self)>> {
+        None
+    }
+
+    /// If this value is a non-empty table whose values are all themselves
+    /// tables, returns the entries as `(key, value)` pairs. Otherwise returns
+    /// `None`. Used to expand map-of-struct leaf fields as TOML sections
+    /// instead of inline tables.
+    fn nested_table_entries(&self) -> Option<Vec<(&str, &Self)>> {
+        None
+    }
 }
 
 /// General (non format-dependent) formatting options.
@@ -198,10 +220,12 @@ fn template_impl<F>(
     F: ConfigFormatter,
 {
     // Output all leaf fields first
-    let leaf_fields = meta.fields.iter().filter_map(|f| match &f.kind {
-        FieldKind::Leaf { kind, env } => Some((f, kind, env)),
-        _ => None,
-    });
+    let leaf_fields = meta.fields.iter()
+        .filter(|f| !f.skip)
+        .filter_map(|f| match &f.kind {
+            FieldKind::Leaf { kind, env } => Some((f, kind, env)),
+            _ => None,
+        });
     let mut emitted_anything = false;
     for (field, kind, env) in leaf_fields {
         if emitted_anything {
@@ -252,10 +276,12 @@ fn template_impl<F>(
     }
 
     // Then all nested fields recursively
-    let nested_fields = meta.fields.iter().filter_map(|f| match &f.kind {
-        FieldKind::Nested { meta } => Some((f, meta)),
-        _ => None,
-    });
+    let nested_fields = meta.fields.iter()
+        .filter(|f| !f.skip)
+        .filter_map(|f| match &f.kind {
+            FieldKind::Nested { meta } => Some((f, meta)),
+            _ => None,
+        });
     for (field, nested_meta) in nested_fields {
         if emitted_anything {
             out.make_gap(options.nested_field_gap);
@@ -308,14 +334,53 @@ fn serialize_impl<F, V>(
     V: ValueAccess,
 {
     // Output all leaf fields first
-    let leaf_fields = meta.fields.iter().filter_map(|f| match &f.kind {
-        FieldKind::Leaf { kind, env } => Some((f, kind, env)),
-        _ => None,
-    });
+    let leaf_fields = meta.fields.iter()
+        .filter(|f| !f.skip)
+        .filter_map(|f| match &f.kind {
+            FieldKind::Leaf { kind, env } => Some((f, kind, env)),
+            _ => None,
+        });
     let mut emitted_anything = false;
     for (field, kind, env) in leaf_fields {
         // Get the value for this field from the serialized config
         let field_value = values.get_field(field.name);
+
+        // If the leaf value is a table-of-tables, expand it as nested sections
+        // instead of rendering inline. This handles map fields like
+        // HashMap<String, SomeStruct> which serialize to nested TOML tables.
+        if let Some(outer_entries) = field_value.and_then(|fv| fv.nested_table_entries()) {
+            if emitted_anything {
+                out.make_gap(options.nested_field_gap);
+            }
+            emitted_anything = true;
+
+            if options.comments {
+                field.doc.iter().for_each(|doc| out.comment(doc));
+                if options.env_keys {
+                    if let Some(env) = env {
+                        out.env_comment(env);
+                    }
+                }
+            }
+
+            out.push_path(field.name);
+            let mut first = true;
+            for (key, inner_table) in &outer_entries {
+                if !first {
+                    out.make_gap(options.leaf_field_gap());
+                }
+                first = false;
+                out.start_nested(key, &[]);
+                if let Some(inner_entries) = inner_table.table_entries() {
+                    for (inner_key, inner_value) in &inner_entries {
+                        out.field(inner_key, &inner_value.format_value());
+                    }
+                }
+                out.end_nested();
+            }
+            out.pop_path();
+            continue;
+        }
 
         // Get the default value
         let default_value = match kind {
@@ -391,10 +456,12 @@ fn serialize_impl<F, V>(
     }
 
     // Then all nested fields recursively
-    let nested_fields = meta.fields.iter().filter_map(|f| match &f.kind {
-        FieldKind::Nested { meta } => Some((f, meta)),
-        _ => None,
-    });
+    let nested_fields = meta.fields.iter()
+        .filter(|f| !f.skip)
+        .filter_map(|f| match &f.kind {
+            FieldKind::Nested { meta } => Some((f, meta)),
+            _ => None,
+        });
     for (field, nested_meta) in nested_fields {
         if emitted_anything {
             out.make_gap(options.nested_field_gap);

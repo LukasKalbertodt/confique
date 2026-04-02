@@ -101,7 +101,7 @@ fn format_expr(expr: &Expr) -> String {
 struct TomlFormatter {
     indent: u8,
     buffer: String,
-    stack: Vec<&'static str>,
+    stack: Vec<String>,
 }
 
 impl TomlFormatter {
@@ -138,26 +138,34 @@ impl ConfigFormatter for TomlFormatter {
         writeln!(self.buffer, "#{comment}").unwrap();
     }
 
-    fn field(&mut self, name: &'static str, value: &str) {
+    fn field(&mut self, name: &str, value: &str) {
         self.emit_indentation();
         writeln!(self.buffer, "{name} = {value}").unwrap();
     }
 
-    fn disabled_field(&mut self, name: &'static str, value: Option<&str>) {
+    fn disabled_field(&mut self, name: &str, value: Option<&str>) {
         match value {
             Some(v) => self.comment(format_args!("{name} = {v}")),
             None => self.comment(format_args!("{name} =")),
         }
     }
 
-    fn start_nested(&mut self, name: &'static str, doc: &[&'static str]) {
-        self.stack.push(name);
+    fn start_nested(&mut self, name: &str, doc: &[&str]) {
+        self.push_path(name);
         doc.iter().for_each(|doc| self.comment(doc));
         self.emit_indentation();
         writeln!(self.buffer, "[{}]", self.stack.join(".")).unwrap();
     }
 
     fn end_nested(&mut self) {
+        self.pop_path();
+    }
+
+    fn push_path(&mut self, name: &str) {
+        self.stack.push(name.to_owned());
+    }
+
+    fn pop_path(&mut self) {
         self.stack.pop().expect("formatter bug: stack empty");
     }
 
@@ -343,6 +351,20 @@ mod serialization {
                 }
             }
         }
+
+        fn table_entries(&self) -> Option<Vec<(&str, &Self)>> {
+            self.as_table()
+                .map(|t| t.iter().map(|(k, v)| (k.as_str(), v)).collect())
+        }
+
+        fn nested_table_entries(&self) -> Option<Vec<(&str, &Self)>> {
+            match self {
+                toml::Value::Table(t) if !t.is_empty() && t.values().all(|v| v.is_table()) => {
+                    Some(t.iter().map(|(k, v)| (k.as_str(), v)).collect())
+                }
+                _ => None,
+            }
+        }
     }
 }
 
@@ -354,6 +376,7 @@ mod tests {
     use pretty_assertions::assert_str_eq;
 
     use super::{template, FormatOptions};
+    use crate::format::ConfigFormatter;
     use crate::test_utils::{self, include_format_output};
 
     #[test]
@@ -390,6 +413,55 @@ mod tests {
     fn immediately_nested() {
         let out = template::<test_utils::example2::Conf>(Default::default());
         assert_str_eq!(&out, include_format_output!("2-default.toml"));
+    }
+
+    #[test]
+    fn skip_field_hidden_from_template() {
+        use crate::meta::*;
+
+        let meta = Meta {
+            name: "Conf",
+            doc: &[],
+            fields: &[
+                Field {
+                    name: "port",
+                    doc: &[" Visible field."],
+                    kind: FieldKind::Leaf {
+                        env: None,
+                        kind: LeafKind::Required {
+                            default: Some(Expr::Integer(Integer::U16(8080))),
+                        },
+                    },
+                    skip: false,
+                },
+                Field {
+                    name: "secret",
+                    doc: &[" This should be hidden."],
+                    kind: FieldKind::Leaf {
+                        env: None,
+                        kind: LeafKind::Optional,
+                    },
+                    skip: true,
+                },
+                Field {
+                    name: "name",
+                    doc: &[" Also visible."],
+                    kind: FieldKind::Leaf {
+                        env: None,
+                        kind: LeafKind::Required { default: None },
+                    },
+                    skip: false,
+                },
+            ],
+        };
+
+        let mut out = super::TomlFormatter::new(&FormatOptions::default());
+        crate::format::template(&meta, &mut out, &FormatOptions::default().general, super::format_expr);
+        let result = out.finish();
+
+        assert!(result.contains("port"), "visible field 'port' should appear in template");
+        assert!(result.contains("name"), "visible field 'name' should appear in template");
+        assert!(!result.contains("secret"), "skipped field 'secret' should NOT appear in template");
     }
 }
 
@@ -452,5 +524,75 @@ mod serialize_tests {
         let serialized = serialize(&config, SerializeFormatOptions::default()).unwrap();
 
         assert_str_eq!(template_output, serialized);
+    }
+
+    #[test]
+    fn table_of_tables_renders_as_sections() {
+        use std::collections::BTreeMap;
+        use crate::test_utils::example4;
+
+        let config = example4::Conf {
+            name: "my-cluster".to_string(),
+            hosts: BTreeMap::from([
+                ("node1".to_string(), example4::Host {
+                    root_img: "/path/to/server.qcow2".to_string(),
+                    num_drives: Some(4),
+                }),
+                ("node2".to_string(), example4::Host {
+                    root_img: "/path/to/client.qcow2".to_string(),
+                    num_drives: None,
+                }),
+            ]),
+        };
+
+        let mut options = SerializeFormatOptions::default();
+        options.general.comments = false;
+        let serialized = serialize(&config, options).unwrap();
+
+        // Should use TOML sections, not inline tables
+        assert!(
+            serialized.contains("[hosts.node1]"),
+            "expected [hosts.node1] section header, got:\n{serialized}"
+        );
+        assert!(
+            serialized.contains("[hosts.node2]"),
+            "expected [hosts.node2] section header, got:\n{serialized}"
+        );
+        assert!(
+            !serialized.contains("hosts = {"),
+            "should NOT render as inline table, got:\n{serialized}"
+        );
+    }
+
+    #[test]
+    fn table_of_tables_round_trip() {
+        use std::collections::BTreeMap;
+        use crate::test_utils::example4;
+
+        let original = example4::Conf {
+            name: "test-cluster".to_string(),
+            hosts: BTreeMap::from([
+                ("server".to_string(), example4::Host {
+                    root_img: "/img/server.qcow2".to_string(),
+                    num_drives: Some(8),
+                }),
+                ("client".to_string(), example4::Host {
+                    root_img: "/img/client.qcow2".to_string(),
+                    num_drives: None,
+                }),
+            ]),
+        };
+
+        let mut options = SerializeFormatOptions::default();
+        options.general.comments = false;
+        let serialized = serialize(&original, options).unwrap();
+
+        // Parse back via TOML and confique builder
+        let parsed: example4::Conf = example4::Conf::builder()
+            .preloaded(toml::from_str(&serialized).unwrap())
+            .load()
+            .unwrap();
+
+        assert_eq!(original, parsed);
     }
 }

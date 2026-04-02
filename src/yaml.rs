@@ -153,19 +153,19 @@ impl ConfigFormatter for YamlFormatter {
         writeln!(self.buffer, "#{comment}").unwrap();
     }
 
-    fn field(&mut self, name: &'static str, value: &str) {
+    fn field(&mut self, name: &str, value: &str) {
         self.emit_indentation();
         writeln!(self.buffer, "{name}: {value}").unwrap();
     }
 
-    fn disabled_field(&mut self, name: &'static str, value: Option<&str>) {
+    fn disabled_field(&mut self, name: &str, value: Option<&str>) {
         match value {
             Some(v) => self.comment(format_args!("{name}: {v}")),
             None => self.comment(format_args!("{name}:")),
         }
     }
 
-    fn start_nested(&mut self, name: &'static str, doc: &[&'static str]) {
+    fn start_nested(&mut self, name: &str, doc: &[&str]) {
         doc.iter().for_each(|doc| self.comment(doc));
         self.emit_indentation();
         writeln!(self.buffer, "{name}:").unwrap();

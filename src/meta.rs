@@ -24,6 +24,7 @@ pub struct Field {
     pub name: &'static str,
     pub doc: &'static [&'static str],
     pub kind: FieldKind,
+    pub skip: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

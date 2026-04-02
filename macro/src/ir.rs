@@ -17,6 +17,7 @@ pub(crate) struct Field {
     pub(crate) doc: Vec<String>,
     pub(crate) name: syn::Ident,
     pub(crate) kind: FieldKind,
+    pub(crate) skip: bool,
     pub(crate) layer_attrs: Vec<TokenStream>
 
     // TODO:
