@@ -42,6 +42,15 @@ pub(crate) trait ConfigFormatter {
     /// Pop a path segment previously pushed by [`push_path`].
     fn pop_path(&mut self) {}
 
+    /// Begin a new array-of-tables element with the given name. Each call
+    /// produces a fresh element (e.g. another `[[name]]` header in TOML).
+    /// The element body must be terminated with [`end_nested`]. Default impl
+    /// delegates to [`start_nested`] so non-array-aware formatters still
+    /// produce structurally valid output.
+    fn start_array_element(&mut self, name: &str) {
+        self.start_nested(name, &[]);
+    }
+
     /// Called after the global docs are written and before any fields are
     /// emitted. Default impl does nothing.
     fn start_main(&mut self) {}
@@ -136,6 +145,14 @@ pub(crate) trait ValueAccess {
     /// `None`. Used to expand map-of-struct leaf fields as TOML sections
     /// instead of inline tables.
     fn nested_table_entries(&self) -> Option<Vec<(&str, &Self)>> {
+        None
+    }
+
+    /// If this value is a non-empty array whose elements are all tables,
+    /// returns the elements. Otherwise returns `None`. Used to expand
+    /// array-of-struct leaf fields as TOML array-of-tables sections instead
+    /// of inline arrays.
+    fn nested_array_entries(&self) -> Option<Vec<&Self>> {
         None
     }
 }
@@ -344,6 +361,41 @@ fn serialize_impl<F, V>(
     for (field, kind, env) in leaf_fields {
         // Get the value for this field from the serialized config
         let field_value = values.get_field(field.name);
+
+        // If the leaf value is a non-empty array of tables, expand it as
+        // TOML array-of-tables sections instead of rendering inline. This
+        // handles fields like Vec<SomeStruct>.
+        if let Some(elements) = field_value.and_then(|fv| fv.nested_array_entries()) {
+            if emitted_anything {
+                out.make_gap(options.nested_field_gap);
+            }
+            emitted_anything = true;
+
+            if options.comments {
+                field.doc.iter().for_each(|doc| out.comment(doc));
+                if options.env_keys {
+                    if let Some(env) = env {
+                        out.env_comment(env);
+                    }
+                }
+            }
+
+            let mut first = true;
+            for inner_table in &elements {
+                if !first {
+                    out.make_gap(options.nested_field_gap);
+                }
+                first = false;
+                out.start_array_element(field.name);
+                if let Some(inner_entries) = inner_table.table_entries() {
+                    for (inner_key, inner_value) in &inner_entries {
+                        out.field(inner_key, &inner_value.format_value());
+                    }
+                }
+                out.end_nested();
+            }
+            continue;
+        }
 
         // If the leaf value is a table-of-tables, expand it as nested sections
         // instead of rendering inline. This handles map fields like

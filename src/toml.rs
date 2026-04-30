@@ -161,6 +161,12 @@ impl ConfigFormatter for TomlFormatter {
         self.pop_path();
     }
 
+    fn start_array_element(&mut self, name: &str) {
+        self.push_path(name);
+        self.emit_indentation();
+        writeln!(self.buffer, "[[{}]]", self.stack.join(".")).unwrap();
+    }
+
     fn push_path(&mut self, name: &str) {
         self.stack.push(name.to_owned());
     }
@@ -365,6 +371,15 @@ mod serialization {
                 _ => None,
             }
         }
+
+        fn nested_array_entries(&self) -> Option<Vec<&Self>> {
+            match self {
+                toml::Value::Array(arr) if !arr.is_empty() && arr.iter().all(|v| v.is_table()) => {
+                    Some(arr.iter().collect())
+                }
+                _ => None,
+            }
+        }
     }
 }
 
@@ -561,6 +576,92 @@ mod serialize_tests {
         assert!(
             !serialized.contains("hosts = {"),
             "should NOT render as inline table, got:\n{serialized}"
+        );
+    }
+
+    #[test]
+    fn array_of_tables_renders_as_double_bracket_sections() {
+        use crate::test_utils::example5;
+
+        let config = example5::Conf {
+            name: "my-cluster".to_string(),
+            post_init: vec![
+                example5::Hook {
+                    kind: "exec".to_string(),
+                    exec: Some("/bin/setup".to_string()),
+                },
+                example5::Hook {
+                    kind: "wait".to_string(),
+                    exec: None,
+                },
+            ],
+        };
+
+        let mut options = SerializeFormatOptions::default();
+        options.general.comments = false;
+        let serialized = serialize(&config, options).unwrap();
+
+        let header_count = serialized.matches("[[post_init]]").count();
+        assert_eq!(
+            header_count, 2,
+            "expected 2 [[post_init]] headers, got:\n{serialized}"
+        );
+        assert!(
+            !serialized.contains("post_init = ["),
+            "should NOT render as inline array, got:\n{serialized}"
+        );
+    }
+
+    #[test]
+    fn array_of_tables_round_trip() {
+        use crate::test_utils::example5;
+
+        let original = example5::Conf {
+            name: "my-cluster".to_string(),
+            post_init: vec![
+                example5::Hook {
+                    kind: "exec".to_string(),
+                    exec: Some("/bin/setup".to_string()),
+                },
+                example5::Hook {
+                    kind: "wait".to_string(),
+                    exec: None,
+                },
+            ],
+        };
+
+        let mut options = SerializeFormatOptions::default();
+        options.general.comments = false;
+        let serialized = serialize(&original, options).unwrap();
+
+        let parsed: example5::Conf = example5::Conf::builder()
+            .preloaded(toml::from_str(&serialized).unwrap())
+            .load()
+            .unwrap();
+
+        assert_eq!(original, parsed);
+    }
+
+    #[test]
+    fn empty_array_of_tables_renders_inline() {
+        use crate::test_utils::example5;
+
+        let config = example5::Conf {
+            name: "my-cluster".to_string(),
+            post_init: vec![],
+        };
+
+        let mut options = SerializeFormatOptions::default();
+        options.general.comments = false;
+        let serialized = serialize(&config, options).unwrap();
+
+        assert!(
+            serialized.contains("post_init = []"),
+            "empty Vec should render as inline empty array, got:\n{serialized}"
+        );
+        assert!(
+            !serialized.contains("[[post_init]]"),
+            "empty Vec should NOT produce array-of-tables headers, got:\n{serialized}"
         );
     }
 
