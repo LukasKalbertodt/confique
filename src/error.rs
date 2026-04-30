@@ -2,8 +2,6 @@ use std::fmt;
 
 use std::path::PathBuf;
 
-
-
 /// Type describing all errors that can occur in this library.
 ///
 /// *Note*: the `Display` and `Debug` impls of this type do not include
@@ -19,7 +17,21 @@ pub struct Error {
 
 impl Error {
     pub(crate) fn field_validation(msg: impl fmt::Display) -> Self {
-        ErrorInner::FieldValidation { msg: msg.to_string() }.into()
+        ErrorInner::FieldValidation {
+            msg: msg.to_string(),
+        }
+        .into()
+    }
+
+    #[cfg(all(
+        feature = "serialize",
+        any(feature = "toml", feature = "yaml", feature = "json5")
+    ))]
+    pub(crate) fn serialization(msg: impl fmt::Display) -> Self {
+        ErrorInner::Serialization {
+            msg: msg.to_string(),
+        }
+        .into()
     }
 }
 
@@ -88,6 +100,13 @@ pub(crate) enum ErrorInner {
 
     /// When a struct validation function fails.
     StructValidation { name: String, msg: String },
+
+    /// When serialization of a config fails.
+    #[cfg(all(
+        feature = "serialize",
+        any(feature = "toml", feature = "yaml", feature = "json5")
+    ))]
+    Serialization { msg: String },
 }
 
 impl std::error::Error for Error {
@@ -104,6 +123,11 @@ impl std::error::Error for Error {
             ErrorInner::MissingRequiredFile { .. } => None,
             ErrorInner::FieldValidation { .. } => None,
             ErrorInner::StructValidation { .. } => None,
+            #[cfg(all(
+                feature = "serialize",
+                any(feature = "toml", feature = "yaml", feature = "json5")
+            ))]
+            ErrorInner::Serialization { .. } => None,
         }
     }
 }
@@ -114,8 +138,11 @@ impl fmt::Display for Error {
             ErrorInner::MissingValue(path) => {
                 std::write!(f, "required configuration value is missing: '{path}'")
             }
-            ErrorInner::Io { path: Some(path), .. } => {
-                std::write!(f,
+            ErrorInner::Io {
+                path: Some(path), ..
+            } => {
+                std::write!(
+                    f,
                     "IO error occured while reading configuration file '{}'",
                     path.display(),
                 )
@@ -123,7 +150,10 @@ impl fmt::Display for Error {
             ErrorInner::Io { path: None, .. } => {
                 std::write!(f, "IO error occured while loading configuration")
             }
-            ErrorInner::Deserialization { source: Some(source), err } => {
+            ErrorInner::Deserialization {
+                source: Some(source),
+                err,
+            } => {
                 std::write!(f, "failed to deserialize configuration from {source}")?;
                 if f.alternate() {
                     f.write_str(": ")?;
@@ -140,16 +170,25 @@ impl fmt::Display for Error {
                 Ok(())
             }
             ErrorInner::EnvNotUnicode { field, key } => {
-                std::write!(f, "failed to load value `{field}` from \
-                    environment variable `{key}`: value is not valid unicode")
+                std::write!(
+                    f,
+                    "failed to load value `{field}` from \
+                    environment variable `{key}`: value is not valid unicode"
+                )
             }
             ErrorInner::EnvDeserialization { field, key, msg } => {
-                std::write!(f, "failed to deserialize value `{field}` from \
-                    environment variable `{key}`: {msg}")
+                std::write!(
+                    f,
+                    "failed to deserialize value `{field}` from \
+                    environment variable `{key}`: {msg}"
+                )
             }
             ErrorInner::EnvParseError { field, key, err } => {
-                std::write!(f, "failed to parse environment variable `{key}` into \
-                    field `{field}`")?;
+                std::write!(
+                    f,
+                    "failed to parse environment variable `{key}` into \
+                    field `{field}`"
+                )?;
                 if f.alternate() {
                     f.write_str(": ")?;
                     fmt::Display::fmt(&err, f)?;
@@ -157,19 +196,22 @@ impl fmt::Display for Error {
                 Ok(())
             }
             ErrorInner::UnsupportedFileFormat { path } => {
-                std::write!(f,
+                std::write!(
+                    f,
                     "unknown configuration file format/extension: '{}'",
                     path.display(),
                 )
             }
             ErrorInner::MissingFileExtension { path } => {
-                std::write!(f,
+                std::write!(
+                    f,
                     "cannot guess configuration file format due to missing file extension in '{}'",
                     path.display(),
                 )
             }
             ErrorInner::MissingRequiredFile { path } => {
-                std::write!(f,
+                std::write!(
+                    f,
                     "required configuration file does not exist: '{}'",
                     path.display(),
                 )
@@ -179,6 +221,13 @@ impl fmt::Display for Error {
             }
             ErrorInner::StructValidation { name, msg } => {
                 std::write!(f, "config validation of `{name}` failed: {msg}")
+            }
+            #[cfg(all(
+                feature = "serialize",
+                any(feature = "toml", feature = "yaml", feature = "json5")
+            ))]
+            ErrorInner::Serialization { msg } => {
+                std::write!(f, "failed to serialize configuration: {msg}")
             }
         }
     }
@@ -192,6 +241,8 @@ impl fmt::Debug for Error {
 
 impl From<ErrorInner> for Error {
     fn from(inner: ErrorInner) -> Self {
-        Self { inner: Box::new(inner) }
+        Self {
+            inner: Box::new(inner),
+        }
     }
 }

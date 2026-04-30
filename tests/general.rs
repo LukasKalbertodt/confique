@@ -33,6 +33,7 @@ fn simple() {
                         default: Some(meta::Expr::Integer(meta::Integer::U32(8080))),
                     },
                 },
+                skip: false,
             },
             meta::Field {
                 name: "dog",
@@ -43,6 +44,7 @@ fn simple() {
                         default: None,
                     },
                 },
+                skip: false,
             },
         ],
     });
@@ -133,10 +135,12 @@ fn full() {
                     env: None,
                     kind: meta::LeafKind::Required { default: None },
                 },
+                skip: false,
             },
             meta::Field {
                 name: "normal",
                 doc: &[],
+                skip: false,
                 kind: meta::FieldKind::Nested {
                     meta: &meta::Meta {
                         name: "NormalTest",
@@ -149,6 +153,7 @@ fn full() {
                                     env: None,
                                     kind: meta::LeafKind::Required { default: None },
                                 },
+                                skip: false,
                             },
                             meta::Field {
                                 name: "with_default",
@@ -159,6 +164,7 @@ fn full() {
                                         default: Some(meta::Expr::Str("127.0.0.1")),
                                     },
                                 },
+                                skip: false,
                             },
                             meta::Field {
                                 name: "optional",
@@ -167,6 +173,7 @@ fn full() {
                                     env: None,
                                     kind: meta::LeafKind::Optional,
                                 },
+                                skip: false,
                             },
                         ],
                     },
@@ -175,6 +182,7 @@ fn full() {
             meta::Field {
                 name: "deserialize_with",
                 doc: &[],
+                skip: false,
                 kind: meta::FieldKind::Nested {
                     meta: &meta::Meta {
                         name: "DeserializeWithTest",
@@ -187,6 +195,7 @@ fn full() {
                                     env: None,
                                     kind: meta::LeafKind::Required { default: None },
                                 },
+                                skip: false,
                             },
                             meta::Field {
                                 name: "with_default",
@@ -197,6 +206,7 @@ fn full() {
                                         default: Some(meta::Expr::Str("peter")),
                                     },
                                 },
+                                skip: false,
                             },
                             meta::Field {
                                 name: "optional",
@@ -205,6 +215,7 @@ fn full() {
                                     env: None,
                                     kind: meta::LeafKind::Optional,
                                 },
+                                skip: false,
                             },
                             meta::Field {
                                 name: "with_env",
@@ -213,6 +224,7 @@ fn full() {
                                     env: Some("ENV_TEST_FULL_0"),
                                     kind: meta::LeafKind::Required { default: None },
                                 },
+                                skip: false,
                             },
                         ]
                     },
@@ -221,6 +233,7 @@ fn full() {
             meta::Field {
                 name: "env",
                 doc: &[" Doc comment on nested."],
+                skip: false,
                 kind: meta::FieldKind::Nested {
                     meta: &meta::Meta {
                         name: "EnvTest",
@@ -233,6 +246,7 @@ fn full() {
                                     env: Some("ENV_TEST_FULL_1"),
                                     kind: meta::LeafKind::Required { default: None },
                                 },
+                                skip: false,
                             },
                             meta::Field {
                                 name: "with_default",
@@ -245,6 +259,7 @@ fn full() {
                                         ),
                                     },
                                 },
+                                skip: false,
                             },
                             meta::Field {
                                 name: "optional",
@@ -253,6 +268,7 @@ fn full() {
                                     env: Some("ENV_TEST_FULL_3"),
                                     kind: meta::LeafKind::Optional,
                                 },
+                                skip: false,
                             },
                             meta::Field {
                                 name: "env_collection",
@@ -261,6 +277,7 @@ fn full() {
                                     env: Some("ENV_TEST_FULL_4"),
                                     kind: meta::LeafKind::Required { default: None },
                                 },
+                                skip: false,
                             },
                         ],
                     },

@@ -35,6 +35,7 @@ fn string_to_u32() {
                         ])),
                     },
                 },
+                skip: false,
             },
         ],
     });

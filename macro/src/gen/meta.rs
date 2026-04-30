@@ -20,6 +20,7 @@ pub(super) fn gen(input: &ir::Input) -> TokenStream {
     let meta_fields = input.fields.iter().map(|f| {
         let name = f.name.to_string();
         let doc =  &f.doc;
+        let skip = f.skip;
         let kind = match &f.kind {
             FieldKind::Nested { ty } => {
                 quote! {
@@ -60,6 +61,7 @@ pub(super) fn gen(input: &ir::Input) -> TokenStream {
                 name: #name,
                 doc: &[ #(#doc),* ],
                 kind: #kind,
+                skip: #skip,
             }
         }
     });

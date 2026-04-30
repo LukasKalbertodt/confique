@@ -172,7 +172,8 @@ impl Field {
             doc,
             name: field.ident.expect("bug: expected named field"),
             kind,
-            layer_attrs: attrs.layer_attrs
+            skip: attrs.skip,
+            layer_attrs: attrs.layer_attrs,
         })
     }
 }
@@ -183,6 +184,7 @@ impl Field {
 #[derive(Default)]
 struct FieldAttrs {
     nested: bool,
+    skip: bool,
     default: Option<Expr>,
     env: Option<String>,
     deserialize_with: Option<syn::Path>,
@@ -193,6 +195,7 @@ struct FieldAttrs {
 
 enum FieldAttr {
     Nested,
+    Skip,
     Default(Expr),
     Env(String),
     DeserializeWith(syn::Path),
@@ -231,6 +234,10 @@ impl FieldAttrs {
                         duplicate_if!(out.nested);
                         out.nested = true;
                     }
+                    FieldAttr::Skip => {
+                        duplicate_if!(out.skip);
+                        out.skip = true;
+                    }
                     FieldAttr::Env(key) => {
                         duplicate_if!(out.env.is_some());
                         out.env = Some(key);
@@ -261,6 +268,7 @@ impl FieldAttr {
     fn keyword(&self) -> &'static str {
         match self {
             Self::Nested => "nested",
+            Self::Skip => "skip",
             Self::Default(_) => "default",
             Self::Env(_) => "env",
             Self::ParseEnv(_) => "parse_env",
@@ -278,6 +286,11 @@ impl Parse for FieldAttr {
             "nested" => {
                 assert_empty_or_comma(input)?;
                 Ok(Self::Nested)
+            }
+
+            "skip" => {
+                assert_empty_or_comma(input)?;
+                Ok(Self::Skip)
             }
 
             "default" => parse_eq_value(input).map(Self::Default),
