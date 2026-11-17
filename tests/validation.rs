@@ -669,6 +669,40 @@ fn layer_validate() {
     );
 }
 
+#[test]
+fn field_validate_methods() {
+    #[derive(Config)]
+    #[allow(dead_code)]
+    struct Conf {
+        #[config(validate = assert_is_ascii, validate = assert_non_banana)]
+        function: String,
+
+        #[config(
+            validate(!assert_like.is_empty(), "must not be empty"),
+            validate(*assert_like != "banana", "banana"),
+        )]
+        assert_like: String,
+
+        #[config(validate = assert_is_ascii, deserialize_with = deserialize_append)]
+        opt: Option<String>,
+
+        no_validator: u32,
+    }
+
+    type Layer = <Conf as Config>::Layer;
+
+    assert!(Layer::validate_function(&"cat".into()).is_ok());
+    assert_err_contains(Layer::validate_function(&"jürgen".into()), "non-ASCII characters");
+    assert_err_contains(Layer::validate_function(&"banana".into()), "banana");
+
+    assert!(Layer::validate_assert_like(&"cat".into()).is_ok());
+    assert_err_contains(Layer::validate_assert_like(&"".into()), "must not be empty");
+    assert_err_contains(Layer::validate_assert_like(&"banana".into()), "banana");
+
+    assert!(Layer::validate_opt(&"cat".into()).is_ok());
+    assert_err_contains(Layer::validate_opt(&"jürgen".into()), "non-ASCII characters");
+}
+
 #[track_caller]
 fn assert_err_contains<T, E: std::fmt::Display>(r: Result<T, E>, expected: &str) {
     let e = r.map(|_| ()).unwrap_err();

@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 - Add `_example` module (just in the docs) to show what the proc macro generates
+- Add `validate_{field}` associated functions to the generated layer type for fields with `validate` attributes. This allows running field validators manually, e.g. for manually constructed layers.
 
 ## [0.4.1] - 2026-11-19
 - ⭐ Add `layer!` and `config!` macros to conveniently build a layer or config in code, e.g. `layer!(Conf { http: { port: 8080, bind: "::1" } })`

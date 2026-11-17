@@ -94,6 +94,7 @@ fn gen_layer_mod(input: &ir::Input) -> TokenStream {
         is_complete_exprs,
         validate_exprs,
         deserialize_into_methods,
+        layer_methods,
         extra_items,
     } = parts;
 
@@ -169,6 +170,7 @@ fn gen_layer_mod(input: &ir::Input) -> TokenStream {
             #[allow(non_snake_case)]
             impl #struct_name {
                 #( #deserialize_into_methods )*
+                #layer_methods
             }
 
             #extra_items
@@ -192,11 +194,15 @@ struct Parts {
     /// The `deserialize_into_{field}` methods of the layer, one per field.
     /// Currently only used by `layer!`.
     deserialize_into_methods: Vec<TokenStream>,
+
+    /// Other inherent methods of the layer type (e.g. `validate_{field}`).
+    layer_methods: TokenStream,
     extra_items: TokenStream,
 }
 
 fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
     let struct_name = &input.name;
+    let (_, layer_struct_name) = layer_names(struct_name);
     let field_name = &f.name;
     parts.field_names.push(field_name.clone());
 
@@ -252,8 +258,9 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
         FieldKind::Leaf { kind, deserialize_with, validate, env, parse_env } => {
             let inner_ty = kind.inner_ty();
 
+            let validate_fn_name = quote::format_ident!("validate_{unraw_field_name}");
+
             // This has an ugly name to avoid clashing with imported names.
-            let validate_fn_name = quote::format_ident!("__confique_validate_{unraw_field_name}");
             let deserialize_fn_name
                 = quote::format_ident!("__confique_deserialize_direct_{unraw_field_name}");
 
@@ -262,8 +269,9 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
             };
 
             // We sometimes emit extra helper functions to avoid code duplication.
-            // Validation should be part of the serialization. `validation_fn` is
-            // `Some(Ident)` if there is a validator function. `deserialize_fn` is
+            // Validation should be part of the serialization. `validate_fn` is
+            // `Some(path)` to the public `validate_{field}` method of the layer
+            // type if there are any validators. `deserialize_fn` is
             // a token stream that represents a callable function that deserializes
             // `inner_ty`.
             let (validate_fn, deserialize_fn) = if validate.len() > 0 {
@@ -289,15 +297,23 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
                     .map(|f| quote!( #f ))
                     .unwrap_or_else(|| default_deserialize_path.clone());
 
-                parts.extra_items.extend(quote! {
+                let doc = format!(
+                    "Runs all validators of the field `{unraw_field_name}` (specified via \
+                        `#[config(validate = ...)]`) on the given value.",
+                );
+                let method_visibility = inner_visibility(&input.visibility, Span::call_site());
+                parts.layer_methods.extend(quote! {
+                    #[doc = #doc]
                     #[inline(never)]
-                    fn #validate_fn_name(
+                    #method_visibility fn #validate_fn_name(
                         v: &#inner_ty,
                     ) -> std::result::Result<(), confique::Error> {
                         #validate_inner
                         std::result::Result::Ok(())
                     }
+                });
 
+                parts.extra_items.extend(quote! {
                     fn #deserialize_fn_name<'de, D>(
                         deserializer: D,
                     ) -> std::result::Result<#inner_ty, D::Error>
@@ -305,13 +321,16 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
                         D: confique::serde::Deserializer<'de>,
                     {
                         let out = #deser_fn(deserializer)?;
-                        #validate_fn_name(&out)
+                        #layer_struct_name::#validate_fn_name(&out)
                             .map_err(<D::Error as confique::serde::de::Error>::custom)?;
                         std::result::Result::Ok(out)
                     }
                 });
 
-                (Some(validate_fn_name), quote! { #deserialize_fn_name })
+                (
+                    Some(quote! { #layer_struct_name::#validate_fn_name }),
+                    quote! { #deserialize_fn_name },
+                )
             } else {
                 // If there is no validation, we will not create a custom
                 // deserialization function for this, so we either use `T::deserialize`
