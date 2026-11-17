@@ -18,8 +18,8 @@ pub struct Error {
 }
 
 impl Error {
-    pub(crate) fn field_validation(msg: impl fmt::Display) -> Self {
-        ErrorInner::FieldValidation { msg: msg.to_string() }.into()
+    pub(crate) fn field_validation(path: &str, msg: impl fmt::Display) -> Self {
+        ErrorInner::FieldValidation { path: path.into(), msg: msg.to_string() }.into()
     }
 }
 
@@ -83,8 +83,9 @@ pub(crate) enum ErrorInner {
     /// A file source was marked as required but the file does not exist.
     MissingRequiredFile { path: PathBuf },
 
-    /// When a field validation function fails.
-    FieldValidation { msg: String },
+    /// When a field validation function fails. `path` is a human-readable
+    /// path to the field, e.g. `port` or `http.port`.
+    FieldValidation { path: String, msg: String },
 
     /// When a struct validation function fails.
     StructValidation { name: String, msg: String },
@@ -174,8 +175,8 @@ impl fmt::Display for Error {
                     path.display(),
                 )
             }
-            ErrorInner::FieldValidation { msg } => {
-                std::write!(f, "validation failed: {msg}")
+            ErrorInner::FieldValidation { path, msg } => {
+                std::write!(f, "validation failed for '{path}': {msg}")
             }
             ErrorInner::StructValidation { name, msg } => {
                 std::write!(f, "config validation of `{name}` failed: {msg}")

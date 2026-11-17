@@ -34,8 +34,9 @@ pub fn map_err_prefix_path<T>(res: Result<T, Error>, prefix: &str) -> Result<T, 
 pub fn validate_field<T, E: Display>(
     t: &T,
     validate: &dyn Fn(&T) -> Result<(), E>,
+    path: &str,
 ) -> Result<(), Error> {
-    validate(t).map_err(Error::field_validation)
+    validate(t).map_err(|msg| Error::field_validation(path, msg))
 }
 
 pub fn validate_struct<T, E: Display>(
@@ -94,7 +95,7 @@ pub fn from_env_with_parser<T, E: std::error::Error + Send + Sync + 'static, E2:
     let is_empty = v.is_empty();
     match parse(&v) {
         Ok(v) => {
-            match validate(&v).map_err(Error::field_validation) {
+            match validate(&v).map_err(|msg| Error::field_validation(field, msg)) {
                 Ok(()) => Ok(Some(v)),
                 Err(_) if is_empty => Ok(None),
                 Err(e) => Err(e),

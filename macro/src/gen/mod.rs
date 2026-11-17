@@ -236,9 +236,10 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
             // a token stream that represents a callable function that deserializes
             // `inner_ty`.
             let (validate_fn, deserialize_fn) = if validate.len() > 0 {
+                let path = unraw_field_name.to_string();
                 let validate_inner = validate.iter().map(|validator| match validator {
                     ir::FieldValidator::Fn(f) => quote_spanned! {f.span() =>
-                        confique::internal::validate_field(v, &#f)?;
+                        confique::internal::validate_field(v, &#f, #path)?;
                     },
                     ir::FieldValidator::Simple(expr, msg) => quote! {
                         confique::internal::validate_field(v, &|v| {
@@ -250,7 +251,7 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
                             } else {
                                 std::result::Result::Ok(())
                             }
-                        })?;
+                        }, #path)?;
                     },
                 }).collect::<TokenStream>();
 

@@ -13,7 +13,7 @@ fn validate_not_1234(foo: &u32) -> Result<(), &'static str> {
 
 #[test]
 #[should_panic(expected = "default config value for `Conf::foo` cannot be \
-    deserialized: Error(\"validation failed: bad password\")")]
+    deserialized: Error(\"validation failed for 'foo': bad password\")")]
 fn invalid_default_panics_function() {
     #[derive(Config)]
     #[allow(dead_code)]
@@ -27,7 +27,7 @@ fn invalid_default_panics_function() {
 
 #[test]
 #[should_panic(expected = "default config value for `Conf::foo` cannot be \
-    deserialized: Error(\"validation failed: ugly number\")")]
+    deserialized: Error(\"validation failed for 'foo': ugly number\")")]
 fn invalid_default_panics_assert_like() {
     #[derive(Config)]
     #[allow(dead_code)]
