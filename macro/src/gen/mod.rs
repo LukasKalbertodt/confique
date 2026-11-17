@@ -1,6 +1,6 @@
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote, quote_spanned};
-use syn::{Ident, spanned::Spanned};
+use syn::{Ident, ext::IdentExt, spanned::Spanned};
 
 use crate::ir::{self, FieldKind, LeafKind};
 
@@ -26,7 +26,7 @@ fn gen_config_impl(input: &ir::Input) -> TokenStream {
     let field_names = input.fields.iter().map(|f| &f.name);
     let from_exprs = input.fields.iter().map(|f| {
         let field_name = &f.name;
-        let path = field_name.to_string();
+        let path = field_name.unraw().to_string();
         match f.kind {
             FieldKind::Nested { .. } => {
                 quote! {
@@ -48,7 +48,7 @@ fn gen_config_impl(input: &ir::Input) -> TokenStream {
     });
 
     let validation = input.validate.as_ref().map(|v| {
-        let struct_name = name.to_string();
+        let struct_name = name.unraw().to_string();
         quote! {
             confique::internal::validate_struct(&out, &#v, #struct_name)?;
         }
@@ -107,7 +107,7 @@ fn gen_layer_mod(input: &ir::Input) -> TokenStream {
             and what's explained in the confique documentation.
             Any other parts of this module cannot be relied on and are not part \
             of the semver guarantee of `confique`.",
-        input.name,
+        input.name.unraw(),
     );
 
     quote! {
@@ -181,7 +181,10 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
     let struct_name = &input.name;
     let field_name = &f.name;
     parts.field_names.push(field_name.clone());
-    let qualified_name = format!("{struct_name}::{field_name}");
+
+    // Names without `r#` prefix, for building strings and new identifiers.
+    let unraw_field_name = field_name.unraw();
+    let qualified_name = format!("{}::{unraw_field_name}", struct_name.unraw());
 
     // We have to use the span of the field's name here so that error
     // messages from the `derive(serde::Deserialize)` have the correct span.
@@ -219,9 +222,9 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
             let inner_ty = kind.inner_ty();
 
             // This has an ugly name to avoid clashing with imported names.
-            let validate_fn_name = quote::format_ident!("__confique_validate_{field_name}");
+            let validate_fn_name = quote::format_ident!("__confique_validate_{unraw_field_name}");
             let deserialize_fn_name
-                = quote::format_ident!("__confique_deserialize_direct_{field_name}");
+                = quote::format_ident!("__confique_deserialize_direct_{unraw_field_name}");
 
             let default_deserialize_path = quote! {
                 <#inner_ty as confique::serde::Deserialize>::deserialize
@@ -297,7 +300,8 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
                     // Since the struct field is `Option<T>`, we need to create
                     // another wrapper deserialization function, that always
                     // returns `Some`.
-                    let fn_name = quote::format_ident!("__confique_deserialize_some_{field_name}");
+                    let fn_name
+                        = quote::format_ident!("__confique_deserialize_some_{unraw_field_name}");
                     parts.extra_items.extend(quote! {
                         fn #fn_name<'de, D>(
                             deserializer: D,
@@ -382,9 +386,10 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
 /// `(mod_name, struct_name)`.
 fn layer_names(original_name: &Ident) -> (Ident, Ident) {
     use heck::ToSnakeCase;
+    let name = original_name.unraw();
     (
-        format_ident!("confique_{}_layer", original_name.to_string().to_snake_case()),
-        format_ident!("{original_name}Layer"),
+        format_ident!("confique_{}_layer", name.to_string().to_snake_case()),
+        format_ident!("{name}Layer"),
     )
 }
 

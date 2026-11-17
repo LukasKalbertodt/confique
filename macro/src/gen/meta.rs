@@ -1,6 +1,6 @@
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
-use syn::Ident;
+use syn::{Ident, ext::IdentExt};
 
 use crate::ir::{self, Expr, FieldKind, LeafKind, MapKey};
 
@@ -15,10 +15,10 @@ pub(super) fn gen(input: &ir::Input) -> TokenStream {
         }
     }
 
-    let name_str = input.name.to_string();
+    let name_str = input.name.unraw().to_string();
     let doc = &input.doc;
     let meta_fields = input.fields.iter().map(|f| {
-        let name = f.name.to_string();
+        let name = f.name.unraw().to_string();
         let doc =  &f.doc;
         let kind = match &f.kind {
             FieldKind::Nested { ty } => {
