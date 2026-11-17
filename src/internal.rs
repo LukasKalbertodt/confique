@@ -85,17 +85,17 @@ pub fn from_env<T>(
     }
 }
 
-pub fn from_env_with_parser<T, E: std::error::Error + Send + Sync + 'static, E2: Display>(
+pub fn from_env_with_parser<T, E: std::error::Error + Send + Sync + 'static>(
     key: &str,
     field: &str,
     parse: fn(&str) -> Result<T, E>,
-    validate: fn(&T) -> Result<(), E2>,
+    validate: fn(&T) -> Result<(), Error>,
 ) -> Result<Option<T>, Error> {
     let v = get_env_var!(key, field);
     let is_empty = v.is_empty();
     match parse(&v) {
         Ok(v) => {
-            match validate(&v).map_err(|msg| Error::field_validation(field, msg)) {
+            match validate(&v) {
                 Ok(()) => Ok(Some(v)),
                 Err(_) if is_empty => Ok(None),
                 Err(e) => Err(e),

@@ -370,7 +370,7 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
                     let validator = match &validate_fn {
                         Some(f) => quote! { #f },
                         None => quote! {
-                            |_| std::result::Result::<(), std::string::String>::Ok(())
+                            |_| std::result::Result::<(), confique::Error>::Ok(())
                         },
                     };
                     quote! {
