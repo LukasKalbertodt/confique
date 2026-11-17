@@ -243,9 +243,9 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
                                 #expr
                             }
                             if !is_valid(v) {
-                                return Err(#msg);
+                                return std::result::Result::Err(#msg);
                             } else {
-                                Ok(())
+                                std::result::Result::Ok(())
                             }
                         })?;
                     },
@@ -261,7 +261,7 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
                         v: &#inner_ty,
                     ) -> std::result::Result<(), confique::Error> {
                         #validate_inner
-                        Ok(())
+                        std::result::Result::Ok(())
                     }
 
                     fn #deserialize_fn_name<'de, D>(
@@ -364,7 +364,9 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
                 (Some(key), Some(parse_env)) => {
                     let validator = match &validate_fn {
                         Some(f) => quote! { #f },
-                        None => quote! { |_| std::result::Result::<(), String>::Ok(()) },
+                        None => quote! {
+                            |_| std::result::Result::<(), std::string::String>::Ok(())
+                        },
                     };
                     quote! {
                         confique::internal::from_env_with_parser(
@@ -418,11 +420,13 @@ fn default_value_to_deserializable_expr(expr: &ir::Expr) -> TokenStream {
             // really doesn't matter what type the array has as there are 0
             // elements anyway. So we just pick `()`.
             let type_annotation = if entries.is_empty() {
-                quote! { as Vec<((), ())> }
+                quote! { as std::vec::Vec<((), ())> }
             } else {
                 quote! {}
             };
-            quote! { confique::internal::MapIntoDeserializer(vec![ #(#items),* ] #type_annotation) }
+            quote! {
+                confique::internal::MapIntoDeserializer(std::vec![ #(#items),* ] #type_annotation)
+            }
         },
     }
 }

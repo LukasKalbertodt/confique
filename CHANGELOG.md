@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 
 ## [Unreleased]
+- Fix derive macro emitting non fully-qualified paths (e.g. `Ok`)
 
 ## [0.4.0] - 2025-10-27
 - **Breaking**: rename `Partial` to `Layer` (including `from_partial` -> `from_layer`, `partial_attr` -> `layer_attr`, and more).
