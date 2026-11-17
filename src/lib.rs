@@ -209,6 +209,13 @@ pub mod yaml;
 #[cfg(test)]
 mod test_utils;
 
+// The derive macro emits paths starting with `confique::`.
+#[cfg(doc)]
+extern crate self as confique;
+
+#[cfg(doc)]
+pub mod _example;
+
 
 pub use serde;
 pub use self::{
