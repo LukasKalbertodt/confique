@@ -600,6 +600,75 @@ fn struct_validation() {
     assert_err_contains(load("foo = 123\nbar=27"), "exactly one of foo and bar must be set");
 }
 
+// Defined outside of the test function, as `nested` fields referring to types
+// defined inside a function don't work with the derive.
+#[derive(Config)]
+#[allow(dead_code)]
+#[config(validate = Self::validate)]
+struct LvConf {
+    #[config(validate(!name.is_empty(), "name must not be empty"))]
+    name: String,
+
+    #[config(validate = assert_is_ascii)]
+    opt: Option<String>,
+
+    no_validator: u32,
+
+    #[config(nested)]
+    child: LvChild,
+}
+
+impl LvConf {
+    fn validate(&self) -> Result<(), &'static str> {
+        Err("struct validator must not run")
+    }
+}
+
+#[derive(Config)]
+#[allow(dead_code)]
+struct LvChild {
+    #[config(validate(*port >= 1024, "port too small"))]
+    port: u16,
+}
+
+#[test]
+fn layer_validate() {
+    type Layer = <LvConf as Config>::Layer;
+    type ChildLayer = <LvChild as Config>::Layer;
+
+    // Missing values are skipped
+    assert!(Layer::empty().validate().is_ok());
+
+    let valid = || Layer {
+        name: Some("peter".into()),
+        opt: Some("fox".into()),
+        no_validator: Some(0),
+        child: ChildLayer { port: Some(8080) },
+    };
+    assert!(valid().validate().is_ok());
+
+    let mut layer = valid();
+    layer.name = Some("".into());
+    assert_eq!(
+        layer.validate().unwrap_err().to_string(),
+        "validation failed for 'name': name must not be empty",
+    );
+
+    let mut layer = valid();
+    layer.opt = Some("jürgen".into());
+    assert_eq!(
+        layer.validate().unwrap_err().to_string(),
+        "validation failed for 'opt': non-ASCII characters are not allowed",
+    );
+
+    let mut layer = valid();
+    layer.child.port = Some(80);
+    assert_eq!(
+        layer.validate().unwrap_err().to_string(),
+        "validation failed for 'child.port': port too small",
+    );
+}
+
 #[track_caller]
 fn assert_err_contains<T, E: std::fmt::Display>(r: Result<T, E>, expected: &str) {
     let e = r.map(|_| ()).unwrap_err();

@@ -92,6 +92,7 @@ fn gen_layer_mod(input: &ir::Input) -> TokenStream {
         fallback_exprs,
         is_empty_exprs,
         is_complete_exprs,
+        validate_exprs,
         extra_items,
     } = parts;
 
@@ -156,6 +157,11 @@ fn gen_layer_mod(input: &ir::Input) -> TokenStream {
                 fn is_complete(&self) -> bool {
                     true #(&& #is_complete_exprs)*
                 }
+
+                fn validate(&self) -> std::result::Result<(), confique::Error> {
+                    #( #validate_exprs )*
+                    std::result::Result::Ok(())
+                }
             }
 
             #extra_items
@@ -174,6 +180,7 @@ struct Parts {
     fallback_exprs: Vec<TokenStream>,
     is_empty_exprs: Vec<TokenStream>,
     is_complete_exprs: Vec<TokenStream>,
+    validate_exprs: Vec<TokenStream>,
     extra_items: TokenStream,
 }
 
@@ -184,6 +191,7 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
 
     // Names without `r#` prefix, for building strings and new identifiers.
     let unraw_field_name = field_name.unraw();
+    let path = unraw_field_name.to_string();
     let qualified_name = format!("{}::{unraw_field_name}", struct_name.unraw());
 
     // We have to use the span of the field's name here so that error
@@ -214,6 +222,12 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
             });
             parts.is_empty_exprs.push(quote! { self.#field_name.is_empty() });
             parts.is_complete_exprs.push(quote! { self.#field_name.is_complete() });
+            parts.validate_exprs.push(quote! {
+                confique::internal::map_err_prefix_path(
+                    confique::Layer::validate(&self.#field_name),
+                    #path,
+                )?;
+            });
         },
 
 
@@ -236,7 +250,6 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
             // a token stream that represents a callable function that deserializes
             // `inner_ty`.
             let (validate_fn, deserialize_fn) = if validate.len() > 0 {
-                let path = unraw_field_name.to_string();
                 let validate_inner = validate.iter().map(|validator| match validator {
                     ir::FieldValidator::Fn(f) => quote_spanned! {f.span() =>
                         confique::internal::validate_field(v, &#f, #path)?;
@@ -342,6 +355,15 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
             parts.is_empty_exprs.push(quote! { self.#field_name.is_none() });
             if kind.is_required() {
                 parts.is_complete_exprs.push(quote! { self.#field_name.is_some() });
+            }
+
+            // Code for `Layer::validate()`
+            if let Some(validate_fn) = &validate_fn {
+                parts.validate_exprs.push(quote! {
+                    if let std::option::Option::Some(v) = &self.#field_name {
+                        #validate_fn(v)?;
+                    }
+                });
             }
 
             // Code for `Layer::default_values()`

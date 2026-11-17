@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 
 ## [Unreleased]
+- Add `Layer::validate()` to run all field validations manually
 - Fix derive macro emitting non fully-qualified paths (e.g. `Ok`)
 - Fix handling of raw identifiers
 

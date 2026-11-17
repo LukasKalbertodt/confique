@@ -388,7 +388,9 @@ pub use crate::{
 /// Adds a validation to the field, i.e. a check that must succeed to be able to
 /// load the configuration. The validator is called as part of the
 /// deserialization, and is thus executed for all layers, not just for the
-/// merged configuration. The attribute can be specified multiple times.
+/// merged configuration. The attribute can be specified multiple times. For
+/// manually constructed layers, you can run all field validators via
+/// [`Layer::validate`].
 ///
 /// > *Note*: remember ["Parse, don't validate"][parse-not-validate]! If you can
 ///    reasonably represent your validation logic as a type, you should use
@@ -693,4 +695,21 @@ pub trait Layer: for<'de> Deserialize<'de> {
     /// configuration are set. If this returns `true`, [`Config::from_layer`]
     /// will not return an error.
     fn is_complete(&self) -> bool;
+
+    /// Runs all field validators (i.e. set via `#[config(validate = ...)]` when
+    /// deriving `Config`) on the values present in this layer, including
+    /// nested layers. Fields that are `None` are skipped. Returns the first
+    /// validation error.
+    ///
+    /// Field validators already run when a layer is deserialized (from files,
+    /// environment variables or default values), so you usually don't need
+    /// to call this. It is useful for layers you construct manually (e.g. from
+    /// command line arguments) before passing them to
+    /// [`Builder::preloaded`]. Struct validators are not run by this, as
+    /// they require the complete configuration (see [`Config::from_layer`]).
+    ///
+    /// The default implementation does nothing and returns `Ok(())`.
+    fn validate(&self) -> Result<(), Error> {
+        Ok(())
+    }
 }

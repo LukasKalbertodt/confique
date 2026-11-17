@@ -30,6 +30,10 @@ fn raw_ident() {
     assert_eq!(Nested::META.fields[0].name, "loop");
 
     let mut layer = <Conf as Config>::Layer::empty();
+    layer.r#type = Some("".into());
+    let err = layer.validate().unwrap_err();
+    assert_eq!(err.to_string(), "validation failed for 'type': must not be empty");
+
     layer.r#type = Some("a".into());
     let err = Conf::from_layer(layer).err().unwrap();
     assert_eq!(err.to_string(), "required configuration value is missing: 'impl.loop'");

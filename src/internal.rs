@@ -22,12 +22,14 @@ pub fn unwrap_or_missing_value_err<T>(value: Option<T>, path: &str) -> Result<T,
 }
 
 pub fn map_err_prefix_path<T>(res: Result<T, Error>, prefix: &str) -> Result<T, Error> {
-    res.map_err(|e| {
-        if let ErrorInner::MissingValue(path) = &*e.inner {
-            ErrorInner::MissingValue(format!("{prefix}.{path}")).into()
-        } else {
-            e
+    res.map_err(|mut e| {
+        match &mut *e.inner {
+            ErrorInner::MissingValue(path) | ErrorInner::FieldValidation { path, .. } => {
+                *path = format!("{prefix}.{path}");
+            }
+            _ => {}
         }
+        e
     })
 }
 
