@@ -213,6 +213,14 @@ mod tests {
     }
 
     #[test]
+    fn no_env_keys() {
+        let mut options = FormatOptions::default();
+        options.general.env_keys = false;
+        let out = template::<test_utils::example1::Conf>(options);
+        assert!(!out.contains("environment variable"), "env keys in output:\n{out}");
+    }
+
+    #[test]
     fn immediately_nested() {
         let out = template::<test_utils::example2::Conf>(Default::default());
         assert_str_eq!(&out, include_format_output!("2-default.json5"));

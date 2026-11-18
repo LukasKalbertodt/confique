@@ -187,7 +187,7 @@ fn format_impl(out: &mut impl Formatter, meta: &Meta, options: &FormatOptions) {
             field.doc.iter().for_each(|doc| out.comment(doc));
             emitted_something = !field.doc.is_empty();
 
-            if let Some(env) = env {
+            if let Some(env) = env.filter(|_| options.env_keys) {
                 empty_sep_doc_line!();
                 out.env_comment(env);
             }

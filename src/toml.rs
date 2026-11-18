@@ -229,6 +229,14 @@ mod tests {
     }
 
     #[test]
+    fn no_env_keys() {
+        let mut options = FormatOptions::default();
+        options.general.env_keys = false;
+        let out = template::<test_utils::example1::Conf>(options);
+        assert!(!out.contains("environment variable"), "env keys in output:\n{out}");
+    }
+
+    #[test]
     fn indent_2() {
         let mut options = FormatOptions::default();
         options.indent = 2;
