@@ -421,7 +421,14 @@ fn layer_names(original_name: &Ident) -> (Ident, Ident) {
 fn default_value_to_deserializable_expr(expr: &ir::Expr) -> TokenStream {
     match expr {
         ir::Expr::Str(lit) => quote! { #lit },
-        ir::Expr::Int(lit, _) => quote! { #lit },
+        ir::Expr::Int(lit, None) => quote! { #lit },
+        ir::Expr::Int(lit, Some(ty)) => {
+            // Without suffix, the literal would be `i32`, which fails to
+            // compile for values outside that range.
+            let repr = format!("{}{}", lit.base10_digits(), ty.suffix());
+            let lit = syn::LitInt::new(&repr, lit.span());
+            quote! { #lit }
+        },
         ir::Expr::Float(lit, _) => quote! { #lit },
         ir::Expr::Bool(lit) => quote! { #lit },
         ir::Expr::Array(arr) => {

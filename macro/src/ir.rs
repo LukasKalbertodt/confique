@@ -146,6 +146,24 @@ impl IntType {
             _ => None,
         }
     }
+
+    /// Returns the literal suffix, which is also the type name, e.g. `u64`.
+    pub(crate) fn suffix(self) -> &'static str {
+        match self {
+            Self::U8 => "u8",
+            Self::U16 => "u16",
+            Self::U32 => "u32",
+            Self::U64 => "u64",
+            Self::U128 => "u128",
+            Self::Usize => "usize",
+            Self::I8 => "i8",
+            Self::I16 => "i16",
+            Self::I32 => "i32",
+            Self::I64 => "i64",
+            Self::I128 => "i128",
+            Self::Isize => "isize",
+        }
+    }
 }
 
 /// The type of a float literal in a default value.

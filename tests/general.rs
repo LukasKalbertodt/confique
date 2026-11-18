@@ -318,3 +318,28 @@ fn empty_array_and_map() {
         dog: HashMap<u32, f32>,
     }
 }
+
+#[test]
+fn int_defaults_outside_i32_range() {
+    #[derive(Config)]
+    #[allow(dead_code)]
+    struct Conf {
+        #[config(default = 3_000_000_000)]
+        a: u32,
+
+        #[config(default = 5_000_000_000)]
+        b: u64,
+
+        #[config(default = [5_000_000_000])]
+        c: Vec<u64>,
+
+        #[config(default = { "x": 5_000_000_000 })]
+        d: HashMap<String, u64>,
+    }
+
+    let def = <Conf as Config>::Layer::default_values();
+    assert_eq!(def.a, Some(3_000_000_000));
+    assert_eq!(def.b, Some(5_000_000_000));
+    assert_eq!(def.c, Some(vec![5_000_000_000]));
+    assert_eq!(def.d, Some(HashMap::from([("x".into(), 5_000_000_000)])));
+}
