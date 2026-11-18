@@ -209,15 +209,18 @@ impl fmt::Display for PrintExpr<'_> {
 }
 
 fn is_valid_bare_key(s: &str) -> bool {
-    s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+    !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
 }
 
 #[cfg(test)]
 mod tests {
     use pretty_assertions::assert_str_eq;
 
-    use crate::test_utils::{self, include_format_output};
-    use super::{template, FormatOptions};
+    use crate::{
+        meta::{Expr, Integer, MapEntry, MapKey},
+        test_utils::{self, include_format_output},
+    };
+    use super::{template, FormatOptions, PrintExpr};
 
     #[test]
     fn default() {
@@ -253,5 +256,14 @@ mod tests {
     fn immediately_nested() {
         let out = template::<test_utils::example2::Conf>(Default::default());
         assert_str_eq!(&out, include_format_output!("2-default.toml"));
+    }
+
+    #[test]
+    fn empty_map_key() {
+        let expr = Expr::Map(&[MapEntry {
+            key: MapKey::Str(""),
+            value: Expr::Integer(Integer::I32(1)),
+        }]);
+        assert_str_eq!(PrintExpr(&expr).to_string(), r#"{ "" = 1 }"#);
     }
 }
