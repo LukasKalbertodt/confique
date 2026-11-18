@@ -189,14 +189,6 @@ impl fmt::Display for PrintExpr<'_> {
                 Ok(())
             },
 
-            // We special case floats as the TOML serializer below doesn't work
-            // well with floats, not rounding them appropriately. See:
-            // https://github.com/toml-rs/toml/issues/494
-            //
-            // For all non-NAN floats, the `Display` output is compatible with
-            // TOML.
-            Expr::Float(fv) if !fv.is_nan() => fv.fmt(f),
-
             // All these other types can simply be serialized as is.
             Expr::Str(_) | Expr::Float(_) | Expr::Integer(_) | Expr::Bool(_) | Expr::Array(_) => {
                 let mut s = String::new();
@@ -217,7 +209,7 @@ mod tests {
     use pretty_assertions::assert_str_eq;
 
     use crate::{
-        meta::{Expr, Integer, MapEntry, MapKey},
+        meta::{Expr, Float, Integer, MapEntry, MapKey},
         test_utils::{self, include_format_output},
     };
     use super::{template, FormatOptions, PrintExpr};
@@ -265,5 +257,14 @@ mod tests {
             value: Expr::Integer(Integer::I32(1)),
         }]);
         assert_str_eq!(PrintExpr(&expr).to_string(), r#"{ "" = 1 }"#);
+    }
+
+    #[test]
+    fn floats() {
+        let print = |f| PrintExpr(&Expr::Float(f)).to_string();
+        assert_str_eq!(print(Float::F64(1.0)), "1.0");
+        assert_str_eq!(print(Float::F64(1e20)), "100000000000000000000.0");
+        assert_str_eq!(print(Float::F32(0.1)), "0.1");
+        assert_str_eq!(print(Float::F64(f64::NAN)), "nan");
     }
 }
