@@ -438,11 +438,14 @@ fn default_value_to_deserializable_expr(expr: &ir::Expr) -> TokenStream {
             // really doesn't matter what type the array has as there are 0
             // elements anyway. So we just pick `()`.
             let type_annotation = if arr.is_empty() {
-                quote! { as [(); 0] }
+                quote! { as std::vec::Vec<()> }
             } else {
                 quote! {}
             };
-            quote! { confique::internal::ArrayIntoDeserializer([ #(#items),* ] #type_annotation) }
+
+            // We use `Vec` and not arrays, as nested arrays can have different
+            // lengths and thus would have different types.
+            quote! { std::vec![ #(#items),* ] #type_annotation }
         },
         ir::Expr::Map(entries) => {
             let items = entries.iter().map(|e| {

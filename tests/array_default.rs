@@ -93,3 +93,22 @@ fn inferred_type() {
     assert_eq!(def.parens, vec![1.0, 2.0]);
     assert_eq!(def.fallback, std::time::Duration::new(13, 27));
 }
+
+#[test]
+fn nested_different_lengths() {
+    #[derive(Config)]
+    struct Foo {
+        #[config(default = [[1, 2], [3]])]
+        nested: Vec<Vec<u32>>,
+
+        #[config(default = { "a": [1, 2], "b": [3] })]
+        in_map: std::collections::HashMap<String, Vec<u32>>,
+    }
+
+    let def = Foo::builder().load().unwrap();
+    assert_eq!(def.nested, vec![vec![1, 2], vec![3]]);
+    assert_eq!(def.in_map, std::collections::HashMap::from([
+        ("a".into(), vec![1, 2]),
+        ("b".into(), vec![3]),
+    ]));
+}
