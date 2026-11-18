@@ -105,7 +105,7 @@ fn gen_layer_mod(input: &ir::Input) -> TokenStream {
         "*Generated* by `confique`: helpers to implement `Config` for [`{}`].\n\
             \n\
             Do not use directly! Only use via the `Config` and `Layer` traits \
-            and what's explained in the confique documentation.
+            and what's explained in the confique documentation. \
             Any other parts of this module cannot be relied on and are not part \
             of the semver guarantee of `confique`.",
         input.name.unraw(),

@@ -82,7 +82,7 @@
 //! With `#[config(validate = ...)]` you can add validation checks. For more
 //! information, see the [docs for the derive macro][macro@Config].
 //!
-//! Note: if a field hast `#[config(nested)]`, its type must implement
+//! Note: if a field has `#[config(nested)]`, its type must implement
 //! [`Config`], otherwise it must implement `serde::Deserialize`.
 //!
 //!
@@ -286,7 +286,7 @@ pub use crate::{
 ///
 /// Doc comments on the struct and the individual fields are interpreted and
 /// stored in [`Meta`][meta::Meta]. They are used in the formatting functions
-/// (e.g. `toml::format`).
+/// (e.g. `toml::template`).
 ///
 /// ## Special types for leaf fields
 ///
@@ -470,7 +470,7 @@ pub use crate::{
 /// #[config(validate = path::to::function)]
 /// ```
 ///
-/// Adds a validation to the config struct, i.e. a check that must suceed to be
+/// Adds a validation to the config struct, i.e. a check that must succeed to be
 /// able to load the configuration. The validator is called inside
 /// `Config::from_layer`, i.e. only after all layers have been merged.
 ///
@@ -597,8 +597,8 @@ pub trait Config: Sized {
     /// Convenience builder to configure, load and merge multiple configuration
     /// sources. **Sources specified earlier have a higher priority**; later
     /// sources only fill in the gaps. After all sources have been loaded, the
-    /// default values (usually specified with `#[default = ...]`) are merged
-    /// (with the lowest priority).
+    /// default values (usually specified with `#[config(default = ...)]`) are
+    /// merged (with the lowest priority).
     ///
     /// # Example
     ///

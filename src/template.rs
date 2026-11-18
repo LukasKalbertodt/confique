@@ -143,9 +143,9 @@ impl Default for FormatOptions {
 
 /// Formats a configuration template with the given formatter.
 ///
-/// If you don't need to use a custom formatter, rather look at the `format`
-/// functions in the format-specific modules (e.g. `toml::format`,
-/// `yaml::format`).
+/// If you don't need to use a custom formatter, rather look at the `template`
+/// functions in the format-specific modules (e.g. `toml::template`,
+/// `yaml::template`).
 pub(crate) fn format(meta: &Meta, out: &mut impl Formatter, options: FormatOptions) {
     // Print root docs.
     if options.comments {

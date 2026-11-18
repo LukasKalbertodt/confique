@@ -51,7 +51,7 @@ fn parse_formats(input: &str) -> Result<Vec<Format>, Infallible> {
 }
 
 fn main() {
-    std::env::set_var("PATHS", "/bin/ls,/usr/local/bin,/usr/bin/ls");
+    std::env::set_var("PATHS", "/bin/ls:/usr/local/bin:/usr/bin/ls");
     std::env::set_var("PORTS", "8080,8888,8000");
     std::env::set_var("NAMES", "Alex|Peter|Mary");
     std::env::set_var("TIMEOUT", "100");
