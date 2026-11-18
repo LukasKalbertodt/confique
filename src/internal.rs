@@ -131,3 +131,24 @@ where
         serde::de::value::MapDeserializer::new(self.0.into_iter())
     }
 }
+
+/// Used to give empty arrays and maps a type. Their element type does not
+/// matter, but it must be inferable: from sibling values (e.g. `[[], [1]]`)
+/// or, if there are none, it should default to `()`. Rust has no such default
+/// for type parameters, but it has one for integer literals: `i32`. So these
+/// functions are called with `0`. If the element type `T` is inferred from
+/// somewhere else, only the `u8` impl applies. Otherwise, the literal falls
+/// back to `i32` and the only `i32` impl then forces `T = ()`.
+pub trait OrUnit<T> {}
+impl<T> OrUnit<T> for u8 {}
+impl OrUnit<()> for i32 {}
+
+/// Empty array, see [`OrUnit`].
+pub fn empty_seq<T, I: OrUnit<T>>(_: I) -> Vec<T> {
+    Vec::new()
+}
+
+/// Empty map, see [`OrUnit`].
+pub fn empty_map<K, V, I: OrUnit<K> + OrUnit<V>>(_: I) -> MapIntoDeserializer<K, V> {
+    MapIntoDeserializer(Vec::new())
+}

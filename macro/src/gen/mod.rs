@@ -431,21 +431,17 @@ fn default_value_to_deserializable_expr(expr: &ir::Expr) -> TokenStream {
         },
         ir::Expr::Float(lit, _) => quote! { #lit },
         ir::Expr::Bool(lit) => quote! { #lit },
+        // Empty arrays and maps need a type that is inferred from sibling
+        // values, or `()` if there are none. See `internal::OrUnit`.
+        ir::Expr::Array(arr) if arr.is_empty() => quote! { confique::internal::empty_seq(0) },
+        ir::Expr::Map(entries) if entries.is_empty() => {
+            quote! { confique::internal::empty_map(0) }
+        },
         ir::Expr::Array(arr) => {
-            let items = arr.iter().map(default_value_to_deserializable_expr);
-
-            // Empty arrays cause "cannot infer type" errors here. However, it
-            // really doesn't matter what type the array has as there are 0
-            // elements anyway. So we just pick `()`.
-            let type_annotation = if arr.is_empty() {
-                quote! { as std::vec::Vec<()> }
-            } else {
-                quote! {}
-            };
-
             // We use `Vec` and not arrays, as nested arrays can have different
             // lengths and thus would have different types.
-            quote! { std::vec![ #(#items),* ] #type_annotation }
+            let items = arr.iter().map(default_value_to_deserializable_expr);
+            quote! { std::vec![ #(#items),* ] }
         },
         ir::Expr::Map(entries) => {
             let items = entries.iter().map(|e| {
@@ -453,18 +449,7 @@ fn default_value_to_deserializable_expr(expr: &ir::Expr) -> TokenStream {
                 let value = default_value_to_deserializable_expr(&e.value);
                 quote! { (#key, #value) }
             });
-
-            // Empty arrays cause "cannot infer type" errors here. However, it
-            // really doesn't matter what type the array has as there are 0
-            // elements anyway. So we just pick `()`.
-            let type_annotation = if entries.is_empty() {
-                quote! { as std::vec::Vec<((), ())> }
-            } else {
-                quote! {}
-            };
-            quote! {
-                confique::internal::MapIntoDeserializer(std::vec![ #(#items),* ] #type_annotation)
-            }
+            quote! { confique::internal::MapIntoDeserializer(std::vec![ #(#items),* ]) }
         },
     }
 }

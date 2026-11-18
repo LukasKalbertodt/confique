@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use pretty_assertions::assert_eq;
 
 use confique::{meta, Config};
@@ -102,13 +103,56 @@ fn nested_different_lengths() {
         nested: Vec<Vec<u32>>,
 
         #[config(default = { "a": [1, 2], "b": [3] })]
-        in_map: std::collections::HashMap<String, Vec<u32>>,
+        in_map: HashMap<String, Vec<u32>>,
     }
 
     let def = Foo::builder().load().unwrap();
     assert_eq!(def.nested, vec![vec![1, 2], vec![3]]);
-    assert_eq!(def.in_map, std::collections::HashMap::from([
+    assert_eq!(def.in_map, HashMap::from([
         ("a".into(), vec![1, 2]),
         ("b".into(), vec![3]),
     ]));
+}
+
+#[test]
+fn nested_empty() {
+    #[derive(Config)]
+    struct Foo {
+        #[config(default = [])]
+        empty: Vec<u32>,
+
+        #[config(default = [[], [1]])]
+        empty_and_filled: Vec<Vec<u32>>,
+
+        #[config(default = [[], []])]
+        all_empty: Vec<Vec<u32>>,
+
+        #[config(default = [[], [[]], [[1]]])]
+        different_depths: Vec<Vec<Vec<u32>>>,
+
+        #[config(default = [{}, { "a": 1 }])]
+        maps: Vec<HashMap<String, u32>>,
+
+        #[config(default = { "a": [], "b": [3] })]
+        map_of_arrays: HashMap<String, Vec<u32>>,
+
+        #[config(default = { "a": {}, "b": { "x": 1 } })]
+        map_of_maps: HashMap<String, HashMap<String, u32>>,
+
+        #[config(default = [{}, { "a": [] }])]
+        all_empty_maps: Vec<HashMap<String, Vec<u32>>>,
+    }
+
+    let def = Foo::builder().load().unwrap();
+    assert_eq!(def.empty, Vec::<u32>::new());
+    assert_eq!(def.empty_and_filled, vec![vec![], vec![1]]);
+    assert_eq!(def.all_empty, vec![Vec::<u32>::new(), vec![]]);
+    assert_eq!(def.different_depths, vec![vec![], vec![vec![]], vec![vec![1]]]);
+    assert_eq!(def.maps, vec![HashMap::new(), HashMap::from([("a".into(), 1)])]);
+    assert_eq!(def.map_of_arrays, HashMap::from([("a".into(), vec![]), ("b".into(), vec![3])]));
+    assert_eq!(def.map_of_maps, HashMap::from([
+        ("a".into(), HashMap::new()),
+        ("b".into(), HashMap::from([("x".into(), 1)])),
+    ]));
+    assert_eq!(def.all_empty_maps, vec![HashMap::new(), HashMap::from([("a".into(), vec![])])]);
 }
