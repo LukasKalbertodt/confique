@@ -2,7 +2,7 @@ use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::{Ident, ext::IdentExt};
 
-use crate::ir::{self, Expr, FieldKind, LeafKind, MapKey};
+use crate::ir::{self, Expr, FieldKind, FloatType, IntType, LeafKind, MapKey};
 
 
 
@@ -35,11 +35,11 @@ pub(super) fn gen(input: &ir::Input) -> TokenStream {
                     }
                 }
             }
-            FieldKind::Leaf { env, kind: LeafKind::Required { default, ty, .. }, ..} => {
+            FieldKind::Leaf { env, kind: LeafKind::Required { default, .. }, ..} => {
                 let env = env_tokens(env);
                 let default_value = match default {
                     Some(default) => {
-                        let meta = default_value_to_meta_expr(default, Some(&ty));
+                        let meta = default_value_to_meta_expr(default);
                         quote! { std::option::Option::Some(#meta) }
                     },
                     None => quote! { std::option::Option::None },
@@ -76,16 +76,17 @@ pub(super) fn gen(input: &ir::Input) -> TokenStream {
 /// Helper macro to deduplicate logic for literals. Only used in the function
 /// below.
 macro_rules! match_literals {
-    ($v:expr, $ty:expr, $ns:ident, { $($other_arms:tt)* }) => {
+    ($v:expr, $ns:ident, { $($other_arms:tt)* }) => {
         match $v {
             $ns::Bool(v) => quote! { confique::meta::$ns::Bool(#v) },
             $ns::Str(s) => quote! { confique::meta::$ns::Str(#s) },
-            $ns::Int(i) => {
-                let variant = infer_type(i.suffix(), $ty, "I32", int_type_to_variant);
+            // Without known type, we use the same fallback as Rust.
+            $ns::Int(i, ty) => {
+                let variant = ty.unwrap_or(IntType::I32).variant();
                 quote! { confique::meta::$ns::Integer(confique::meta::Integer::#variant(#i)) }
             }
-            $ns::Float(f) => {
-                let variant = infer_type(f.suffix(), $ty, "F64", float_type_to_variant);
+            $ns::Float(f, ty) => {
+                let variant = ty.unwrap_or(FloatType::F64).variant();
                 quote! { confique::meta::$ns::Float(confique::meta::Float::#variant(#f)) }
             }
             $($other_arms)*
@@ -94,24 +95,17 @@ macro_rules! match_literals {
 }
 
 /// Generates the meta expression of type `meta::Expr` to be used for the
-/// `default` field. `ty` is the type of the field that is used to better infer
-/// the exact type of the default value.
-fn default_value_to_meta_expr(default: &Expr, ty: Option<&syn::Type>) -> TokenStream {
-    match_literals!(default, ty, Expr, {
+/// `default` field.
+fn default_value_to_meta_expr(default: &Expr) -> TokenStream {
+    match_literals!(default, Expr, {
         Expr::Array(items) => {
-            let item_type = ty.and_then(get_array_item_type);
-            let items = items.iter().map(|item| default_value_to_meta_expr(item, item_type));
+            let items = items.iter().map(default_value_to_meta_expr);
             quote! { confique::meta::Expr::Array(&[#( #items ),*]) }
         }
         Expr::Map(entries) => {
-            // TODO: use `Option::unzip` once stable
-            let types = ty.and_then(get_map_entry_types);
-            let key_type = types.map(|(t, _)| t);
-            let value_type = types.map(|(_, v)| v);
-
             let pairs = entries.iter().map(|e| {
-                let key = match_literals!(&e.key, key_type, MapKey, {});
-                let value = default_value_to_meta_expr(&e.value, value_type);
+                let key = match_literals!(&e.key, MapKey, {});
+                let value = default_value_to_meta_expr(&e.value);
                 quote! { confique::meta::MapEntry { key: #key, value: #value } }
             });
             quote! { confique::meta::Expr::Map(&[#( #pairs ),*]) }
@@ -119,128 +113,34 @@ fn default_value_to_meta_expr(default: &Expr, ty: Option<&syn::Type>) -> TokenSt
     })
 }
 
-/// Maps an integer type to the `meta::Expr` variant (e.g. `u32` -> `U32`).
-fn int_type_to_variant(suffix: &str) -> Option<&'static str> {
-    match suffix {
-        "u8" => Some("U8"),
-        "u16" => Some("U16"),
-        "u32" => Some("U32"),
-        "u64" => Some("U64"),
-        "u128" => Some("U128"),
-        "usize" => Some("Usize"),
-        "i8" => Some("I8"),
-        "i16" => Some("I16"),
-        "i32" => Some("I32"),
-        "i64" => Some("I64"),
-        "i128" => Some("I128"),
-        "isize" => Some("Isize"),
-        _ => None,
+impl IntType {
+    /// Returns the name of the corresponding `meta::Integer` variant.
+    fn variant(self) -> Ident {
+        let name = match self {
+            Self::U8 => "U8",
+            Self::U16 => "U16",
+            Self::U32 => "U32",
+            Self::U64 => "U64",
+            Self::U128 => "U128",
+            Self::Usize => "Usize",
+            Self::I8 => "I8",
+            Self::I16 => "I16",
+            Self::I32 => "I32",
+            Self::I64 => "I64",
+            Self::I128 => "I128",
+            Self::Isize => "Isize",
+        };
+        Ident::new(name, Span::call_site())
     }
 }
 
-/// Maps a float type to the `meta::Expr` variant (e.g. `f32` -> `F32`).
-fn float_type_to_variant(suffix: &str) -> Option<&'static str> {
-    match suffix {
-        "f32" => Some("F32"),
-        "f64" => Some("F64"),
-        _ => None,
-    }
-}
-
-/// Tries to infer the type of an int or float default value.
-///
-/// To figure out the type of int or float literals, we first look at the type
-/// suffix of the literal. If it is specified, we use that. Otherwise we check
-/// if the field type is a known float/integer type. If so, we use that.
-/// Otherwise we use a default.
-fn infer_type(
-    suffix: &str,
-    field_ty: Option<&syn::Type>,
-    default: &str,
-    map: fn(&str) -> Option<&'static str>,
-) -> Ident {
-    let variant = map(suffix)
-        .or_else(|| {
-            if let Some(syn::Type::Path(syn::TypePath { qself: None, path })) = field_ty {
-                path.get_ident().and_then(|i| map(&i.to_string()))
-            } else {
-                None
-            }
-        })
-        .unwrap_or(default);
-
-    Ident::new(variant, Span::call_site())
-}
-
-/// Tries to extract the type of the item of a field with an array default
-/// value. Examples: `&[u32]` -> `u32`, `Vec<String>` -> `String`.
-fn get_array_item_type(ty: &syn::Type) -> Option<&syn::Type> {
-    match ty {
-        // The easy types.
-        syn::Type::Slice(slice) => Some(&slice.elem),
-        syn::Type::Array(array) => Some(&*array.elem),
-
-        // This is the least clear case. We certainly want to cover `Vec<T>` but
-        // ideally some more cases. On the other hand, we just can't really
-        // know, so some incorrect guesses are definitely expected here. Most
-        // are likely filtered out by applying `gen_meta_default` to it, but
-        // some will result in a wrong default value type. But people can
-        // always just add a prefix to the literal in those cases.
-        //
-        // We simply check if the last element in the path has exactly one
-        // generic type argument, in which case we use that.
-        syn::Type::Path(p) => {
-            let args = match &p.path.segments.last().expect("empty type path").arguments {
-                syn::PathArguments::AngleBracketed(args) => &args.args,
-                _ => return None,
-            };
-
-            if args.len() != 1 {
-                return None;
-            }
-
-            match &args[0] {
-                syn::GenericArgument::Type(t) => Some(t),
-                _ => None,
-            }
-        },
-
-        // Just recurse on inner type.
-        syn::Type::Reference(r) => get_array_item_type(&r.elem),
-        syn::Type::Group(g) => get_array_item_type(&g.elem),
-        syn::Type::Paren(p) => get_array_item_type(&p.elem),
-
-        _ => None,
-    }
-}
-
-/// Tries to extract the key and value types from a map value. Examples:
-/// `HashMap<String, u32>` -> `(String, u32)`.
-fn get_map_entry_types(ty: &syn::Type) -> Option<(&syn::Type, &syn::Type)> {
-    match ty {
-        // We simply check if the last element in the path has exactly two
-        // generic type arguments, in which case we use those. Otherwise we
-        // can't really know.
-        syn::Type::Path(p) => {
-            let args = match &p.path.segments.last().expect("empty type path").arguments {
-                syn::PathArguments::AngleBracketed(args) => &args.args,
-                _ => return None,
-            };
-
-            if args.len() != 2 {
-                return None;
-            }
-
-            match (&args[0], &args[1]) {
-                (syn::GenericArgument::Type(k), syn::GenericArgument::Type(v)) => Some((k, v)),
-                _ => None,
-            }
-        },
-
-        // Just recurse on inner type.
-        syn::Type::Group(g) => get_map_entry_types(&g.elem),
-        syn::Type::Paren(p) => get_map_entry_types(&p.elem),
-
-        _ => None,
+impl FloatType {
+    /// Returns the name of the corresponding `meta::Float` variant.
+    fn variant(self) -> Ident {
+        let name = match self {
+            Self::F32 => "F32",
+            Self::F64 => "F64",
+        };
+        Ident::new(name, Span::call_site())
     }
 }

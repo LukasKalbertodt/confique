@@ -44,3 +44,76 @@ pub(crate) fn unwrap_option(ty: &syn::Type) -> Option<&syn::Type> {
 pub(crate) fn is_option(ty: &syn::Type) -> bool {
     unwrap_option(ty).is_some()
 }
+
+/// Tries to extract the type of the item of a field with an array default
+/// value. Examples: `&[u32]` -> `u32`, `Vec<String>` -> `String`.
+pub(crate) fn get_array_item_type(ty: &syn::Type) -> Option<&syn::Type> {
+    match ty {
+        // The easy types.
+        syn::Type::Slice(slice) => Some(&slice.elem),
+        syn::Type::Array(array) => Some(&*array.elem),
+
+        // This is the least clear case. We certainly want to cover `Vec<T>` but
+        // ideally some more cases. On the other hand, we just can't really
+        // know, so some incorrect guesses are definitely expected here. Most
+        // are likely filtered out by applying `gen_meta_default` to it, but
+        // some will result in a wrong default value type. But people can
+        // always just add a prefix to the literal in those cases.
+        //
+        // We simply check if the last element in the path has exactly one
+        // generic type argument, in which case we use that.
+        syn::Type::Path(p) => {
+            let args = match &p.path.segments.last().expect("empty type path").arguments {
+                syn::PathArguments::AngleBracketed(args) => &args.args,
+                _ => return None,
+            };
+
+            if args.len() != 1 {
+                return None;
+            }
+
+            match &args[0] {
+                syn::GenericArgument::Type(t) => Some(t),
+                _ => None,
+            }
+        },
+
+        // Just recurse on inner type.
+        syn::Type::Reference(r) => get_array_item_type(&r.elem),
+        syn::Type::Group(g) => get_array_item_type(&g.elem),
+        syn::Type::Paren(p) => get_array_item_type(&p.elem),
+
+        _ => None,
+    }
+}
+
+/// Tries to extract the key and value types from a map value. Examples:
+/// `HashMap<String, u32>` -> `(String, u32)`.
+pub(crate) fn get_map_entry_types(ty: &syn::Type) -> Option<(&syn::Type, &syn::Type)> {
+    match ty {
+        // We simply check if the last element in the path has exactly two
+        // generic type arguments, in which case we use those. Otherwise we
+        // can't really know.
+        syn::Type::Path(p) => {
+            let args = match &p.path.segments.last().expect("empty type path").arguments {
+                syn::PathArguments::AngleBracketed(args) => &args.args,
+                _ => return None,
+            };
+
+            if args.len() != 2 {
+                return None;
+            }
+
+            match (&args[0], &args[1]) {
+                (syn::GenericArgument::Type(k), syn::GenericArgument::Type(v)) => Some((k, v)),
+                _ => None,
+            }
+        },
+
+        // Just recurse on inner type.
+        syn::Type::Group(g) => get_map_entry_types(&g.elem),
+        syn::Type::Paren(p) => get_map_entry_types(&p.elem),
+
+        _ => None,
+    }
+}

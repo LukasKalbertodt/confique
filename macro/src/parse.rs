@@ -7,8 +7,11 @@ use syn::{
 };
 
 use crate::{
-    ir::{Expr, Field, FieldKind, FieldValidator, Input, LeafKind, MapEntry, MapKey},
-    util::{is_option, unwrap_option},
+    ir::{
+        Expr, Field, FieldKind, FieldValidator, FloatType, Input, IntType, LeafKind, MapEntry,
+        MapKey,
+    },
+    util::{get_array_item_type, get_map_entry_types, is_option, unwrap_option},
 };
 
 
@@ -156,7 +159,13 @@ impl Field {
                             values (`#[config(default = ...)]`)");
                 },
                 Some(inner) => LeafKind::Optional { inner_ty: inner.clone() },
-                None => LeafKind::Required { default: attrs.default, ty: field.ty },
+                None => {
+                    let mut default = attrs.default;
+                    if let Some(default) = &mut default {
+                        default.infer_types(Some(&field.ty));
+                    }
+                    LeafKind::Required { default, ty: field.ty }
+                }
             };
 
             FieldKind::Leaf {
@@ -393,14 +402,71 @@ impl Parse for MapKey {
         let lit: syn::Lit = input.parse()?;
         match lit {
             syn::Lit::Str(l) => Ok(Self::Str(l)),
-            syn::Lit::Int(l) => Ok(Self::Int(l)),
-            syn::Lit::Float(l) => Ok(Self::Float(l)),
+            syn::Lit::Int(l) => {
+                let ty = IntType::from_suffix(l.suffix());
+                Ok(Self::Int(l, ty))
+            }
+            syn::Lit::Float(l) => {
+                let ty = FloatType::from_suffix(l.suffix());
+                Ok(Self::Float(l, ty))
+            }
             syn::Lit::Bool(l) => Ok(Self::Bool(l)),
             _ => Err(Error::new(
                 lit.span(),
                 "only string, integer, float, and Boolean literals allowed as map key",
             )),
         }
+    }
+}
+
+impl Expr {
+    /// Infers the types of int and float literals without suffix from the
+    /// field type `ty`, e.g. `5` for a field `u64` is `u64`. This is just a
+    /// heuristic: if no type can be inferred, they stay `None`.
+    fn infer_types(&mut self, ty: Option<&syn::Type>) {
+        match self {
+            Self::Str(_) | Self::Bool(_) => {}
+            Self::Int(_, int_ty) => infer_num_type(ty, IntType::from_suffix, int_ty),
+            Self::Float(_, float_ty) => infer_num_type(ty, FloatType::from_suffix, float_ty),
+            Self::Array(items) => {
+                let item_ty = ty.and_then(get_array_item_type);
+                items.iter_mut().for_each(|item| item.infer_types(item_ty));
+            }
+            Self::Map(entries) => {
+                let types = ty.and_then(get_map_entry_types);
+                for entry in entries {
+                    entry.key.infer_type(types.map(|(k, _)| k));
+                    entry.value.infer_types(types.map(|(_, v)| v));
+                }
+            }
+        }
+    }
+}
+
+impl MapKey {
+    /// Like `Expr::infer_types`.
+    fn infer_type(&mut self, ty: Option<&syn::Type>) {
+        match self {
+            Self::Str(_) | Self::Bool(_) => {}
+            Self::Int(_, int_ty) => infer_num_type(ty, IntType::from_suffix, int_ty),
+            Self::Float(_, float_ty) => infer_num_type(ty, FloatType::from_suffix, float_ty),
+        }
+    }
+}
+
+/// If `out` is `None` (i.e. the literal has no suffix) and `field_ty` is a
+/// number type known to `from_suffix` (e.g. `u64`), sets `out` to that type.
+fn infer_num_type<T>(
+    field_ty: Option<&syn::Type>,
+    from_suffix: fn(&str) -> Option<T>,
+    out: &mut Option<T>,
+) {
+    if out.is_some() {
+        return;
+    }
+
+    if let Some(syn::Type::Path(syn::TypePath { qself: None, path })) = field_ty {
+        *out = path.get_ident().and_then(|i| from_suffix(&i.to_string()));
     }
 }
 

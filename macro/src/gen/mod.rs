@@ -421,8 +421,8 @@ fn layer_names(original_name: &Ident) -> (Ident, Ident) {
 fn default_value_to_deserializable_expr(expr: &ir::Expr) -> TokenStream {
     match expr {
         ir::Expr::Str(lit) => quote! { #lit },
-        ir::Expr::Int(lit) => quote! { #lit },
-        ir::Expr::Float(lit) => quote! { #lit },
+        ir::Expr::Int(lit, _) => quote! { #lit },
+        ir::Expr::Float(lit, _) => quote! { #lit },
         ir::Expr::Bool(lit) => quote! { #lit },
         ir::Expr::Array(arr) => {
             let items = arr.iter().map(default_value_to_deserializable_expr);

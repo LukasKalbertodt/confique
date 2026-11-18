@@ -73,10 +73,14 @@ impl LeafKind {
 
 /// The kinds of expressions (just literals) we allow for default or example
 /// values.
+///
+/// The types of int and float literals are taken from their suffix or inferred
+/// from the field type. `None` means neither worked, in which case Rust's
+/// fallback (`i32` and `f64`) applies.
 pub(crate) enum Expr {
     Str(syn::LitStr),
-    Int(syn::LitInt),
-    Float(syn::LitFloat),
+    Int(syn::LitInt, Option<IntType>),
+    Float(syn::LitFloat, Option<FloatType>),
     Bool(syn::LitBool),
     Array(Vec<Expr>),
     Map(Vec<MapEntry>),
@@ -90,8 +94,8 @@ pub(crate) struct MapEntry {
 #[derive(Clone)]
 pub(crate) enum MapKey {
     Str(syn::LitStr),
-    Int(syn::LitInt),
-    Float(syn::LitFloat),
+    Int(syn::LitInt, Option<IntType>),
+    Float(syn::LitFloat, Option<FloatType>),
     Bool(syn::LitBool),
 }
 
@@ -99,9 +103,65 @@ impl From<MapKey> for Expr {
     fn from(src: MapKey) -> Self {
         match src {
             MapKey::Str(v) => Self::Str(v),
-            MapKey::Int(v) => Self::Int(v),
-            MapKey::Float(v) => Self::Float(v),
+            MapKey::Int(v, ty) => Self::Int(v, ty),
+            MapKey::Float(v, ty) => Self::Float(v, ty),
             MapKey::Bool(v) => Self::Bool(v),
+        }
+    }
+}
+
+/// The type of an integer literal in a default value.
+#[derive(Clone, Copy)]
+pub(crate) enum IntType {
+    U8,
+    U16,
+    U32,
+    U64,
+    U128,
+    Usize,
+    I8,
+    I16,
+    I32,
+    I64,
+    I128,
+    Isize,
+}
+
+impl IntType {
+    /// Parses a literal suffix or type name, e.g. `u64`.
+    pub(crate) fn from_suffix(s: &str) -> Option<Self> {
+        match s {
+            "u8" => Some(Self::U8),
+            "u16" => Some(Self::U16),
+            "u32" => Some(Self::U32),
+            "u64" => Some(Self::U64),
+            "u128" => Some(Self::U128),
+            "usize" => Some(Self::Usize),
+            "i8" => Some(Self::I8),
+            "i16" => Some(Self::I16),
+            "i32" => Some(Self::I32),
+            "i64" => Some(Self::I64),
+            "i128" => Some(Self::I128),
+            "isize" => Some(Self::Isize),
+            _ => None,
+        }
+    }
+}
+
+/// The type of a float literal in a default value.
+#[derive(Clone, Copy)]
+pub(crate) enum FloatType {
+    F32,
+    F64,
+}
+
+impl FloatType {
+    /// Parses a literal suffix or type name, e.g. `f32`.
+    pub(crate) fn from_suffix(s: &str) -> Option<Self> {
+        match s {
+            "f32" => Some(Self::F32),
+            "f64" => Some(Self::F64),
+            _ => None,
         }
     }
 }
