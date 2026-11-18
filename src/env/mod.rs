@@ -104,10 +104,12 @@ impl<'de> serde::Deserializer<'de> for Deserializer {
     deserialize_via_parse!(deserialize_i16, visit_i16, i16);
     deserialize_via_parse!(deserialize_i32, visit_i32, i32);
     deserialize_via_parse!(deserialize_i64, visit_i64, i64);
+    deserialize_via_parse!(deserialize_i128, visit_i128, i128);
     deserialize_via_parse!(deserialize_u8, visit_u8, u8);
     deserialize_via_parse!(deserialize_u16, visit_u16, u16);
     deserialize_via_parse!(deserialize_u32, visit_u32, u32);
     deserialize_via_parse!(deserialize_u64, visit_u64, u64);
+    deserialize_via_parse!(deserialize_u128, visit_u128, u128);
     deserialize_via_parse!(deserialize_f32, visit_f32, f32);
     deserialize_via_parse!(deserialize_f64, visit_f64, f64);
 
