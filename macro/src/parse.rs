@@ -379,10 +379,16 @@ impl Expr {
         // If Rust expressions are allowed, a `[...]` or `{...}` is only an
         // array or map if it is the whole value. For example, `[1, 2].len()`
         // is a Rust expression. So is a `{...}` not looking like a map, which
-        // is a Rust block.
+        // is a Rust block, and `[x; 3]`, which has a `;` directly inside
+        // the brackets.
         let fork = input.fork();
-        let whole_value = fork.parse::<Group>().is_ok() && at_value_end(&fork);
-        let is_array = input.peek(syn::token::Bracket) && (!allow_rust || whole_value);
+        let group = fork.parse::<Group>().ok();
+        let whole_value = group.is_some() && at_value_end(&fork);
+        let is_bracket = input.peek(syn::token::Bracket);
+        let has_semicolon = group.into_iter().flat_map(|g| g.stream())
+            .any(|tt| matches!(&tt, TokenTree::Punct(p) if p.as_char() == ';'));
+        let is_array_repeat = allow_rust && is_bracket && whole_value && has_semicolon;
+        let is_array = is_bracket && (!allow_rust || whole_value) && !is_array_repeat;
         let is_map = input.peek(syn::token::Brace)
             && (!allow_rust || (whole_value && looks_like_map(input)));
 
@@ -394,6 +400,10 @@ impl Expr {
             let content;
             syn::braced!(content in input);
             parse_list(&content, |input| MapEntry::parse(input, allow_rust)).map(Self::Map)
+        } else if is_array_repeat {
+            // This becomes a `Vec`, as arrays are not deserializable.
+            let group: Group = input.parse()?;
+            Ok(Self::Rust(quote::quote! { std::vec! #group }))
         } else if allow_rust {
             parse_rust_expr(input).map(Self::Rust)
         } else {
