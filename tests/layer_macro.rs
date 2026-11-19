@@ -497,3 +497,89 @@ fn config_macro() {
     let err = confique::config!(Conf { name: "peter", port: -1 }).unwrap_err();
     assert_eq!(err.to_string(), "failed to deserialize configuration from field 'port'");
 }
+
+#[derive(Debug, PartialEq, confique::serde::Deserialize)]
+#[serde(crate = "confique::serde", rename_all = "lowercase")]
+enum LogoSize { Wide, Narrow }
+
+#[derive(Debug, PartialEq, confique::serde::Deserialize)]
+#[serde(crate = "confique::serde")]
+struct Resolution([u32; 2]);
+
+#[derive(Debug, PartialEq, confique::serde::Deserialize)]
+#[serde(crate = "confique::serde")]
+struct LogoDef {
+    size: Option<LogoSize>,
+    lang: Option<String>,
+    path: PathBuf,
+    resolution: Resolution,
+}
+
+#[derive(Debug, Config)]
+#[config(layer_attr(derive(Debug)))]
+#[allow(dead_code)]
+struct Theme {
+    #[config(validate(!logos.is_empty(), "no logos"))]
+    logos: Vec<LogoDef>,
+    by_name: HashMap<String, LogoDef>,
+    mixed: (u8, String, Vec<f32>),
+}
+
+#[test]
+fn heterogeneous() {
+    let w = 425;
+    let layer = layer!(Theme {
+        logos: [
+            { "path": "logo.svg", "resolution": [w, 182] },
+            {
+                "path": "small.svg",
+                "resolution": [1, 1],
+                "size": "narrow",
+                "lang": String::from("de"),
+            },
+        ],
+        by_name: { "a": { "path": String::from("a.svg"), "resolution": vec![1u32, 2] } },
+        mixed: [1, "foo", [1.5, 2]],
+    }).unwrap();
+
+    assert_eq!(layer.logos, Some(vec![
+        LogoDef {
+            size: None,
+            lang: None,
+            path: "logo.svg".into(),
+            resolution: Resolution([425, 182]),
+        },
+        LogoDef {
+            size: Some(LogoSize::Narrow),
+            lang: Some("de".into()),
+            path: "small.svg".into(),
+            resolution: Resolution([1, 1]),
+        },
+    ]));
+    assert_eq!(layer.by_name.unwrap()["a"].resolution, Resolution([1, 2]));
+    assert_eq!(layer.mixed, Some((1, "foo".into(), vec![1.5, 2.0])));
+
+    let err = layer!(Theme { logos: [{ "path": "x.svg" }] }).unwrap_err();
+    assert_eq!(
+        format!("{err:#}"),
+        "failed to deserialize configuration from field 'logos': missing field `resolution`",
+    );
+}
+
+#[derive(Config)]
+#[config(layer_attr(derive(Debug)))]
+#[allow(dead_code)]
+struct CStrings {
+    strings: Vec<std::ffi::CString>,
+}
+
+#[test]
+fn bytes_in_arrays() {
+    use std::ffi::CString;
+
+    let layer = layer!(CStrings { strings: [&b"foo"[..], "bar"] }).unwrap();
+    assert_eq!(
+        layer.strings,
+        Some(vec![CString::new("foo").unwrap(), CString::new("bar").unwrap()]),
+    );
+}

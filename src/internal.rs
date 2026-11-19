@@ -6,6 +6,10 @@ use std::fmt::Display;
 
 use crate::{error::ErrorInner, Error};
 
+pub use self::value::Value;
+
+mod value;
+
 
 pub fn into_deserializer<'de, T>(src: T) -> <T as serde::de::IntoDeserializer<'de>>::Deserializer
 where
@@ -125,45 +129,6 @@ pub fn from_env_with_parser<T, E: std::error::Error + Send + Sync + 'static>(
             }.into()
         ),
     }
-}
-
-/// `serde` does implement `IntoDeserializer` for `HashMap` and `BTreeMap` but
-/// we want to keep the exact source code order of entries, so we need our own
-/// type.
-pub struct MapIntoDeserializer<K, V>(pub Vec<(K, V)>);
-
-impl<'de, K, V, E> serde::de::IntoDeserializer<'de, E> for MapIntoDeserializer<K, V>
-where
-    K: serde::de::IntoDeserializer<'de, E>,
-    V: serde::de::IntoDeserializer<'de, E>,
-    E: serde::de::Error,
-{
-    type Deserializer = serde::de::value::MapDeserializer<'de, std::vec::IntoIter<(K, V)>, E>;
-
-    fn into_deserializer(self) -> Self::Deserializer {
-        serde::de::value::MapDeserializer::new(self.0.into_iter())
-    }
-}
-
-/// Used to give empty arrays and maps a type. Their element type does not
-/// matter, but it must be inferable: from sibling values (e.g. `[[], [1]]`)
-/// or, if there are none, it should default to `()`. Rust has no such default
-/// for type parameters, but it has one for integer literals: `i32`. So these
-/// functions are called with `0`. If the element type `T` is inferred from
-/// somewhere else, only the `u8` impl applies. Otherwise, the literal falls
-/// back to `i32` and the only `i32` impl then forces `T = ()`.
-pub trait OrUnit<T> {}
-impl<T> OrUnit<T> for u8 {}
-impl OrUnit<()> for i32 {}
-
-/// Empty array, see [`OrUnit`].
-pub fn empty_seq<T, I: OrUnit<T>>(_: I) -> Vec<T> {
-    Vec::new()
-}
-
-/// Empty map, see [`OrUnit`].
-pub fn empty_map<K, V, I: OrUnit<K> + OrUnit<V>>(_: I) -> MapIntoDeserializer<K, V> {
-    MapIntoDeserializer(Vec::new())
 }
 
 /// A field of a layer that a raw value can be assigned to, see

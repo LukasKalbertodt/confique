@@ -623,11 +623,10 @@ pub use confique_macro::Config;
 ///   more.
 /// - **An array**, e.g. `["foo", "bar"]`, deserialized as a sequence. Items
 ///   can be any expression implementing [`IntoDeserializer`], or again an
-///   array or map, e.g. `[[1, 2], [3]]`.
+///   array or map, e.g. `[[1, 2], [3]]`. Items can have different types.
 /// - **A map**, e.g. `{ "foo": 1, "bar": 2 }`, deserialized as a map
 ///   (preserving the order of entries). Keys need to be literals, values can
-///   be anything that array items can be, e.g.
-///   `{ "admins": ["anna"], "guests": [] }`. `{}` is an empty map.
+///   be anything that array items can be.
 /// - **A nested configuration**, e.g. `{ port: 8080, bind: "::1" }`, using the
 ///   same syntax recursively. Distinguished from a map by the field names
 ///   being identifiers, not literals.
@@ -637,12 +636,6 @@ pub use confique_macro::Config;
 ///   and `deserialize_with` are not applied! Use [`Layer::validate`] if you
 ///   need to run field validators. For a nested configuration, the expression
 ///   needs to be its layer, which replaces the whole nested layer.
-///
-/// All items of one array need to have the same Rust type, e.g. `[1.5, 2.0]`
-/// and not `[1.5, 2]`. The same is true for all keys and for all values of
-/// one map. For this purpose, a nested array is a `Vec`, so `[[1, 2], my_vec]`
-/// works. A nested map has its own type though, so it cannot be mixed with
-/// expressions of type `HashMap`.
 ///
 /// Integer literals without type suffix are `i32` as usual, but are converted
 /// to the field's type when deserialized (failing if the value doesn't fit).
