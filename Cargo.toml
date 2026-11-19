@@ -15,6 +15,10 @@ keywords = ["config", "configuration", "conf", "serde", "type-safe"]
 categories = ["config"]
 exclude = [".github"]
 
+[workspace]
+members = ["macro"]
+exclude = ["tests/indirect-serde"]
+
 
 [[example]]
 name = "simple"
