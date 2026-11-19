@@ -101,3 +101,12 @@ fn layer_macro() {
         },
     });
 }
+
+#[test]
+fn config_macro() {
+    let _ = confique::config!(Conf {
+        title: "foo",
+        http: { port: 8080 },
+        misc: { list: [], validated_list: [1, 2] },
+    });
+}

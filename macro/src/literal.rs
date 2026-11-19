@@ -1,4 +1,4 @@
-//! Implementation of the `layer!` macro.
+//! Implementation of the `layer!` and `config!` macros.
 
 use std::collections::HashSet;
 
@@ -16,6 +16,13 @@ use crate::{
     parse::{at_value_end, parse_list, peek_braces, peek_colon},
 };
 
+
+/// Which of the two macros is expanded. They only differ in what is done
+/// with the layer in the end.
+pub(crate) enum Macro {
+    Layer,
+    Config,
+}
 
 /// An entry of the form `name: value`.
 struct Field {
@@ -86,7 +93,7 @@ fn is_nested(input: ParseStream) -> bool {
 
 // ===== Code generation ==========================================================
 
-pub(crate) fn run(input: TokenStream) -> Result<TokenStream, Error> {
+pub(crate) fn run(input: TokenStream, mac: Macro) -> Result<TokenStream, Error> {
     let parser = |input: ParseStream| {
         let ty: syn::TypePath = input.parse()?;
         let content;
@@ -106,11 +113,22 @@ pub(crate) fn run(input: TokenStream) -> Result<TokenStream, Error> {
     let mut assignments = TokenStream::new();
     ctx.gen_fields(&fields, &quote! { #layer }, "", &mut assignments);
 
+    // `config!` additionally uses the default values as fallback and
+    // converts the layer to the configuration type.
+    let result = match mac {
+        Macro::Layer => quote! { std::result::Result::Ok::<_, confique::Error>(#layer) },
+        Macro::Config => quote! {
+            <#ty as confique::Config>::from_layer(
+                confique::Layer::with_fallback(#layer, confique::Layer::default_values())
+            )
+        },
+    };
+
     Ok(quote! {
         #label: {
             let mut #layer = <<#ty as confique::Config>::Layer as confique::Layer>::empty();
             #assignments
-            std::result::Result::Ok::<_, confique::Error>(#layer)
+            #result
         }
     })
 }

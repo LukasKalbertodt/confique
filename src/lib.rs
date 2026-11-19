@@ -557,7 +557,7 @@ pub use crate::{
 /// ```
 pub use confique_macro::Config;
 
-/// Creates a config layer directly in code.
+/// Creates a configuration layer directly in code.
 ///
 /// This is a convenient alternative to building a layer with struct literal
 /// syntax (where all values have to be `Some(_)` of the exact field type), or
@@ -604,7 +604,8 @@ pub use confique_macro::Config;
 /// mentioned are `None`/empty, i.e. default values are *not* applied. To get
 /// your actual configuration, use the layer like any other, e.g. pass it to
 /// [`Builder::preloaded`], or combine it with other layers via
-/// [`Layer::with_fallback`] and [`Layer::default_values`].
+/// [`Layer::with_fallback`] and [`Layer::default_values`]. If you only need
+/// the default values as fallback, use [`config!`] instead.
 ///
 ///
 /// # Syntax
@@ -660,6 +661,37 @@ pub use confique_macro::Config;
 ///
 /// [`IntoDeserializer`]: crate::serde::de::IntoDeserializer
 pub use confique_macro::layer;
+
+/// Creates a configuration directly in code, using default values for all
+/// fields not specified.
+///
+/// Uses the same syntax as [`layer!`] and is a shorthand for creating a layer
+/// with it, adding [`Layer::default_values`] as fallback and calling
+/// [`Config::from_layer`].
+///
+/// ```
+/// use std::net::IpAddr;
+/// use confique::Config;
+///
+/// #[derive(Config)]
+/// struct Conf {
+///     #[config(default = 8080)]
+///     port: u16,
+///     bind: IpAddr,
+/// }
+///
+/// # fn main() -> Result<(), confique::Error> {
+/// let conf = confique::config!(Conf { bind: "127.0.0.1" })?;
+/// assert_eq!(conf.port, 8080);
+/// assert_eq!(conf.bind, IpAddr::from([127, 0, 0, 1]));
+/// # Ok(())
+/// # }
+/// ```
+///
+/// Returns `Result<C, Error>`. In addition to the errors of `layer!`, this
+/// fails if a required value is neither specified nor has a default value, or
+/// if a struct validator fails.
+pub use confique_macro::config;
 
 
 /// A configuration object that can be deserialized in layers via `serde`.

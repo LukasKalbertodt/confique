@@ -430,7 +430,7 @@ fn raw_ident() {
     let err = layer!(Conf { misc: { r#type: "" } }).unwrap_err();
     assert_eq!(
         format!("{err:#}"),
-        "failed to deserialize configuration from `layer!` field 'misc.type': \
+        "failed to deserialize configuration from field 'misc.type': \
             validation failed for 'type': must not be empty",
     );
 }
@@ -440,7 +440,7 @@ fn errors() {
     let err = layer!(Conf { http: { timeout: 100 } }).unwrap_err();
     assert_eq!(
         format!("{err:#}"),
-        "failed to deserialize configuration from `layer!` field 'http.timeout': \
+        "failed to deserialize configuration from field 'http.timeout': \
             validation failed for 'timeout': timeout too long",
     );
 
@@ -448,14 +448,14 @@ fn errors() {
     let err = layer!(Conf { port: 70000 }).unwrap_err();
     let msg = format!("{err:#}");
     assert!(
-        msg.starts_with("failed to deserialize configuration from `layer!` field 'port': "),
+        msg.starts_with("failed to deserialize configuration from field 'port': "),
         "unexpected error message: {msg}",
     );
 
     let err = layer!(Conf { http: { bind: "localhost" } }).unwrap_err();
     assert_eq!(
         err.to_string(),
-        "failed to deserialize configuration from `layer!` field 'http.bind'",
+        "failed to deserialize configuration from field 'http.bind'",
     );
 
     // Values after the first error are not evaluated.
@@ -478,4 +478,22 @@ fn with_defaults() {
     assert_eq!(conf.http.bind, IpAddr::from([127, 0, 0, 1]));
     assert_eq!(conf.http.headers, Vec::<String>::new());
     assert_eq!(conf.log_file, None);
+}
+
+#[test]
+fn config_macro() {
+    let conf = confique::config!(Conf {
+        name: "peter",
+        http: { headers: ["x-user"] },
+    }).unwrap();
+    assert_eq!(conf.name, "peter");
+    assert_eq!(conf.port, 8080);
+    assert_eq!(conf.http.bind, IpAddr::from([127, 0, 0, 1]));
+    assert_eq!(conf.http.headers, vec!["x-user".to_string()]);
+
+    let err = confique::config!(Conf { http: { headers: [] } }).unwrap_err();
+    assert_eq!(err.to_string(), "required configuration value is missing: 'name'");
+
+    let err = confique::config!(Conf { name: "peter", port: -1 }).unwrap_err();
+    assert_eq!(err.to_string(), "failed to deserialize configuration from field 'port'");
 }
