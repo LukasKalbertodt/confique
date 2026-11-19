@@ -634,8 +634,8 @@ pub use confique_macro::Config;
 ///   expression is assigned as is (i.e. `Some(expr)`) and needs to have the
 ///   exact type of the field. This is *not* deserialized, so field validators
 ///   and `deserialize_with` are not applied! Use [`Layer::validate`] if you
-///   need to run field validators. This does not work for nested
-///   configurations.
+///   need to run field validators. For a nested configuration, the expression
+///   needs to be its layer, which replaces the whole nested layer.
 ///
 /// All items of one array need to have the same Rust type, e.g. `[1.5, 2.0]`
 /// and not `[1.5, 2]`. The same is true for all keys and for all values of

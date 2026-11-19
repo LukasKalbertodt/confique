@@ -144,13 +144,16 @@ impl Context {
                     self.gen_fields(fields, &quote! { #parent.#name }, &format!("{path}."), out);
                 }
 
-                // This is `Some(expr)`, but type mismatches lead to way
-                // shorter error messages with this syntax.
+                // Assigns `Some(expr)` to leaf fields and `expr` to nested
+                // ones, see `RawAssignableField`.
                 Value::Raw(group) => {
                     let expr = group.stream();
                     let span = Span::mixed_site().located_at(group.span());
                     out.extend(quote_spanned! {span=>
-                        #parent.#name = std::option::Option::Some { 0: #expr };
+                        confique::internal::RawValueAssigner {
+                            field: &mut #parent.#name,
+                            value: #expr,
+                        }.set();
                     });
                 }
 

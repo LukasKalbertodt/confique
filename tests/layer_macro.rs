@@ -362,6 +362,16 @@ fn raw_values() {
 }
 
 #[test]
+fn raw_nested() {
+    let http = layer!(Http { bind: "10.0.0.1" }).unwrap();
+    let layer = layer!(Conf { port: 42, http: #(http) }).unwrap();
+
+    assert_eq!(layer.port, Some(42));
+    assert_eq!(layer.http.bind, Some(IpAddr::from([10, 0, 0, 1])));
+    assert_eq!(layer.http.timeout, None);
+}
+
+#[test]
 fn question_mark_in_values() {
     fn make(port: &str, timeout: &str) -> Result<ConfLayer, Box<dyn std::error::Error>> {
         Ok(layer!(Conf {

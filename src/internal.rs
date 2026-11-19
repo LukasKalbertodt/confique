@@ -164,3 +164,38 @@ pub fn empty_seq<T, I: OrUnit<T>>(_: I) -> Vec<T> {
 pub fn empty_map<K, V, I: OrUnit<K> + OrUnit<V>>(_: I) -> MapIntoDeserializer<K, V> {
     MapIntoDeserializer(Vec::new())
 }
+
+/// A field of a layer that a raw value can be assigned to, see
+/// [`RawValueAssigner`]. For leaf fields, the value is wrapped in `Some`, for
+/// nested ones, it is the nested layer.
+pub trait RawAssignableField {
+    type Value;
+    fn set(&mut self, value: Self::Value);
+}
+
+impl<T> RawAssignableField for Option<T> {
+    type Value = T;
+    fn set(&mut self, value: T) {
+        *self = Some(value);
+    }
+}
+
+impl<L: crate::Layer> RawAssignableField for L {
+    type Value = L;
+    fn set(&mut self, value: L) {
+        *self = value;
+    }
+}
+
+/// Used by `layer!` for `#(expr)` values. A struct (instead of a function) as
+/// that leads to way shorter error messages for type mismatches.
+pub struct RawValueAssigner<'a, F: RawAssignableField> {
+    pub field: &'a mut F,
+    pub value: F::Value,
+}
+
+impl<F: RawAssignableField> RawValueAssigner<'_, F> {
+    pub fn set(self) {
+        self.field.set(self.value);
+    }
+}
