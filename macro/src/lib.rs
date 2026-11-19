@@ -4,6 +4,7 @@ use proc_macro::TokenStream as TokenStream1;
 mod gen;
 mod ir;
 mod parse;
+mod scan;
 mod util;
 
 
