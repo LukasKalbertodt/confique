@@ -4,9 +4,26 @@ All notable changes to this project will be documented in this file.
 
 
 ## [Unreleased]
+
+## [0.4.1] - 2026-11-19
+- ⭐ Add `layer!` and `config!` macros to conveniently build a layer or config in code, e.g. `layer!(Conf { http: { port: 8080, bind: "::1" } })`
+  - `layer!` returns the layer, `config!` additionally uses default values as fallback and returns the final config type.
+  - Values are deserialized into the fields, so they don't need the exact type and field validators are applied.
+  - `#(expr)` assigns a raw Rust value without deserialization.
 - Add `Layer::validate()` to run all field validations manually
+- Allow items of different types in array and map default values, e.g. `[1, 2.5]`
+- Include field name in field validation errors: `validation failed for 'port': ...`
+- Support `u128` and `i128` when loading from env vars
 - Fix derive macro emitting non fully-qualified paths (e.g. `Ok`)
 - Fix handling of raw identifiers
+- Fix integer default values outside the `i32` range not compiling, e.g. `#[config(default = 5_000_000_000)] foo: u64`
+- Fix nested array default values with different lengths not compiling, e.g. `[[1, 2], [3]]`
+- Fix empty arrays/maps nested in default values not compiling, e.g. `[[], [1]]`
+- Fix `FormatOptions::env_keys` being ignored (env keys were always emitted)
+- Fix float formatting in TOML templates (`1.0` was printed as `1`, large floats as out-of-range integers)
+- Fix empty map keys resulting in invalid TOML templates (`{ = 1 }`)
+- Fix duplicate "validation failed: validation failed:" in error message when using `parse_env`
+- Fix typos in docs and examples
 
 ## [0.4.0] - 2025-10-27
 - **Breaking**: rename `Partial` to `Layer` (including `from_partial` -> `from_layer`, `partial_attr` -> `layer_attr`, and more).
@@ -145,7 +162,8 @@ All notable changes to this project will be documented in this file.
 - Everything.
 
 
-[Unreleased]: https://github.com/LukasKalbertodt/confique/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/LukasKalbertodt/confique/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/LukasKalbertodt/confique/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/LukasKalbertodt/confique/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/LukasKalbertodt/confique/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/LukasKalbertodt/confique/compare/v0.2.6...v0.3.0
