@@ -110,6 +110,7 @@ fn default_value_to_meta_expr(default: &Expr) -> TokenStream {
             });
             quote! { confique::meta::Expr::Map(&[#( #pairs ),*]) }
         }
+        Expr::Rust(_) => unreachable!("bug: Rust expression in default value"),
     })
 }
 

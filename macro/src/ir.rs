@@ -71,8 +71,8 @@ impl LeafKind {
     }
 }
 
-/// The kinds of expressions (just literals) we allow for default or example
-/// values.
+/// The kinds of expressions we allow for default values and for values in
+/// `layer!`. For default values, that's just literals.
 ///
 /// The types of int and float literals are taken from their suffix or inferred
 /// from the field type. `None` means neither worked, in which case Rust's
@@ -84,6 +84,10 @@ pub(crate) enum Expr {
     Bool(syn::LitBool),
     Array(Vec<Expr>),
     Map(Vec<MapEntry>),
+
+    /// An arbitrary Rust expression. Only in `layer!`, never in default
+    /// values. There, literals are also represented by this.
+    Rust(TokenStream),
 }
 
 pub(crate) struct MapEntry {

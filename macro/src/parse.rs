@@ -1,6 +1,6 @@
 use proc_macro2::{Delimiter, Group, Ident, TokenStream, TokenTree};
 use syn::{
-    parse::{Parse, ParseBuffer, ParseStream},
+    parse::{Parse, ParseBuffer, ParseStream, Parser},
     punctuated::Punctuated,
     spanned::Spanned,
     Error, Token,
@@ -11,6 +11,7 @@ use crate::{
         Expr, Field, FieldKind, FieldValidator, FloatType, Input, IntType, LeafKind, MapEntry,
         MapKey,
     },
+    scan::ExprScanner,
     util::{get_array_item_type, get_map_entry_types, is_option, unwrap_option},
 };
 
@@ -289,7 +290,12 @@ impl Parse for FieldAttr {
                 Ok(Self::Nested)
             }
 
-            "default" => parse_eq_value(input).map(Self::Default),
+            "default" => {
+                let _: Token![=] = input.parse()?;
+                let expr = Expr::parse_default(input)?;
+                assert_empty_or_comma(input)?;
+                Ok(Self::Default(expr))
+            }
 
             "env" => {
                 let key: syn::LitStr = parse_eq_value(input)?;
@@ -357,27 +363,42 @@ impl Parse for FieldAttr {
 
 // ===== Expr =====================================================================
 
-impl Parse for Expr {
-    fn parse(input: ParseStream) -> Result<Self, syn::Error> {
-        let msg = "invalid default value. Allowed are only: certain literals \
-            (string, integer, float, bool), and arrays";
+impl Expr {
+    /// Parses a default value, i.e. only literals, arrays and maps are allowed.
+    pub(crate) fn parse_default(input: ParseStream) -> Result<Self, Error> {
+        Self::parse_value(input, false)
+    }
 
-        if input.peek(syn::token::Bracket) {
-            // ----- Array -----
+    /// Parses a value of `layer!`: like a default value, but with arbitrary
+    /// Rust expressions instead of just literals.
+    pub(crate) fn parse_with_rust(input: ParseStream) -> Result<Self, Error> {
+        Self::parse_value(input, true)
+    }
+
+    fn parse_value(input: ParseStream, allow_rust: bool) -> Result<Self, Error> {
+        // If Rust expressions are allowed, a `[...]` or `{...}` is only an
+        // array or map if it is the whole value. For example, `[1, 2].len()`
+        // is a Rust expression. So is a `{...}` not looking like a map, which
+        // is a Rust block.
+        let fork = input.fork();
+        let whole_value = fork.parse::<Group>().is_ok() && at_value_end(&fork);
+        let is_array = input.peek(syn::token::Bracket) && (!allow_rust || whole_value);
+        let is_map = input.peek(syn::token::Brace)
+            && (!allow_rust || (whole_value && looks_like_map(input)));
+
+        if is_array {
             let content;
             syn::bracketed!(content in input);
-
-            let items = <Punctuated<Expr, Token![,]>>::parse_terminated(&content)?;
-            Ok(Self::Array(items.into_iter().collect()))
-        } else if input.peek(syn::token::Brace) {
-            // ----- Map -----
+            parse_list(&content, |input| Self::parse_value(input, allow_rust)).map(Self::Array)
+        } else if is_map {
             let content;
             syn::braced!(content in input);
-
-            let items = <Punctuated<MapEntry, Token![,]>>::parse_terminated(&content)?;
-            Ok(Self::Map(items.into_iter().collect()))
+            parse_list(&content, |input| MapEntry::parse(input, allow_rust)).map(Self::Map)
+        } else if allow_rust {
+            parse_rust_expr(input).map(Self::Rust)
         } else {
-            // ----- Literal -----
+            let msg = "invalid default value. Allowed are only: certain literals \
+                (string, integer, float, bool), arrays and maps.";
 
             // We just use `MapKey` here as it's exactly what we want, despite
             // this not having anything to do with maps.
@@ -388,13 +409,38 @@ impl Parse for Expr {
     }
 }
 
-impl Parse for MapEntry {
-    fn parse(input: ParseStream) -> Result<Self, syn::Error> {
+impl MapEntry {
+    fn parse(input: ParseStream, allow_rust: bool) -> Result<Self, Error> {
         let key: MapKey = input.parse()?;
         let _: syn::Token![:] = input.parse()?;
-        let value: Expr = input.parse()?;
+        let value = Expr::parse_value(input, allow_rust)?;
         Ok(Self { key, value })
     }
+}
+
+/// Returns the tokens of a Rust expression: everything up to the comma ending
+/// it or the end of input. See [`ExprScanner`].
+fn parse_rust_expr(input: ParseStream) -> Result<TokenStream, Error> {
+    let mut scanner = ExprScanner::default();
+    let mut tokens = TokenStream::new();
+    while !input.is_empty() && !(scanner.at_top_level() && input.peek(Token![,])) {
+        let tt: TokenTree = input.parse()?;
+        scanner.push(&tt);
+        tokens.extend([tt]);
+    }
+
+    if tokens.is_empty() {
+        return Err(input.error("expected value"));
+    }
+    Ok(tokens)
+}
+
+/// Returns `true` if the `{...}` at the start of `input` is empty or starts
+/// with `<literal>:`.
+fn looks_like_map(input: ParseStream) -> bool {
+    peek_braces(input, |content| {
+        content.is_empty() || (content.parse::<syn::Lit>().is_ok() && peek_colon(content))
+    })
 }
 
 impl Parse for MapKey {
@@ -425,7 +471,7 @@ impl Expr {
     /// heuristic: if no type can be inferred, they stay `None`.
     fn infer_types(&mut self, ty: Option<&syn::Type>) {
         match self {
-            Self::Str(_) | Self::Bool(_) => {}
+            Self::Str(_) | Self::Bool(_) | Self::Rust(_) => {}
             Self::Int(_, int_ty) => infer_num_type(ty, IntType::from_suffix, int_ty),
             Self::Float(_, float_ty) => infer_num_type(ty, FloatType::from_suffix, float_ty),
             Self::Array(items) => {
@@ -481,6 +527,50 @@ fn parse_layer_attr(input: &ParseBuffer<'_>) -> syn::Result<TokenStream> {
     }
     assert_empty_or_comma(&input)?;
     Ok(g.stream())
+}
+
+/// Parses a comma separated list with optional trailing comma, until `input`
+/// is empty.
+pub(crate) fn parse_list<T>(
+    input: ParseStream,
+    parse_item: impl Fn(ParseStream) -> Result<T, Error>,
+) -> Result<Vec<T>, Error> {
+    let mut out = Vec::new();
+    while !input.is_empty() {
+        out.push(parse_item(input)?);
+        if !input.is_empty() {
+            let _: Token![,] = input.parse()?;
+        }
+    }
+    Ok(out)
+}
+
+/// Returns `true` if a value ends here: at a comma or the end of input.
+pub(crate) fn at_value_end(input: ParseStream) -> bool {
+    input.is_empty() || input.peek(Token![,])
+}
+
+/// Returns `true` if `input` starts with a single colon, not with `::`.
+pub(crate) fn peek_colon(input: ParseStream) -> bool {
+    input.peek(Token![:]) && !input.peek(Token![::])
+}
+
+/// Applies `f` to the content of the `{...}` at the start of `input`, without
+/// advancing `input`. Returns `false` if there is no `{...}`.
+pub(crate) fn peek_braces(input: ParseStream, f: fn(ParseStream) -> bool) -> bool {
+    let group = match input.fork().parse::<Group>() {
+        Ok(group) if group.delimiter() == Delimiter::Brace => group,
+        _ => return false,
+    };
+
+    // `f` usually only looks at the first few tokens, but `parse2` errors if
+    // there are tokens left. So we consume the rest.
+    let parser = |content: ParseStream| {
+        let out = f(content);
+        let _: TokenStream = content.parse()?;
+        Ok(out)
+    };
+    parser.parse2(group.stream()).unwrap_or(false)
 }
 
 fn assert_empty_or_comma(input: ParseStream) -> Result<(), Error> {

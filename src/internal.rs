@@ -33,6 +33,18 @@ pub fn map_err_prefix_path<T>(res: Result<T, Error>, prefix: &str) -> Result<T, 
     })
 }
 
+/// Used by `layer!` to convert the error of deserializing a single field.
+/// `path` is the path of that field, e.g. `http.port`, mentioned in the error.
+pub fn map_layer_field_err(
+    res: Result<(), serde::de::value::Error>,
+    path: &str,
+) -> Result<(), Error> {
+    res.map_err(|err| ErrorInner::Deserialization {
+        source: Some(format!("`layer!` field '{path}'")),
+        err: Box::new(err),
+    }.into())
+}
+
 pub fn validate_field<T, E: Display>(
     t: &T,
     validate: &dyn Fn(&T) -> Result<(), E>,

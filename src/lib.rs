@@ -118,8 +118,8 @@
 //! `serde::Deserialize` and can thus be loaded from a vast number of sources.
 //! One of those sources is the built-in [`File`] which gives you a bit more
 //! control when loading configuration from files. And you can always simply
-//! create an instance of the layer type by writing all values in Rust code
-//! with struct initializer syntax!
+//! create an instance of the layer type in Rust code, either with struct
+//! initializer syntax or, more conveniently, with the [`layer!`] macro.
 //!
 //! Once you have all your layers collected, you have to combine
 //! them via [`Layer::with_fallback`] and convert them to the actual config
@@ -556,6 +556,110 @@ pub use crate::{
 /// }
 /// ```
 pub use confique_macro::Config;
+
+/// Creates a config layer directly in code.
+///
+/// This is a convenient alternative to building a layer with struct literal
+/// syntax (where all values have to be `Some(_)` of the exact field type), or
+/// to writing a config file inside your Rust code. It is mostly useful for
+/// tests or for providing a layer with fixed values.
+///
+/// ```
+/// use std::{env::temp_dir, net::IpAddr, path::PathBuf};
+/// use confique::Config;
+///
+/// #[derive(Config)]
+/// struct Conf {
+///     #[config(nested)]
+///     http: HttpConf,
+///     log_file: PathBuf,
+/// }
+///
+/// #[derive(Config)]
+/// struct HttpConf {
+///     #[config(default = 8080)]
+///     port: u16,
+///     bind: IpAddr,
+///     headers: Vec<String>,
+/// }
+///
+/// # fn main() -> Result<(), confique::Error> {
+/// let layer = confique::layer!(Conf {
+///     http: {                                 // nested configuration
+///         bind: "127.0.0.1",                  // string deserialized into `IpAddr`
+///         headers: ["x-user", "x-password"],  // array deserialized into `Vec<String>`
+///     },
+///     log_file: #(temp_dir().join("app.log")), // raw Rust value of exact type
+/// })?;
+///
+/// assert_eq!(layer.http.port, None); // default values are not applied
+/// assert_eq!(layer.http.bind, Some(IpAddr::from([127, 0, 0, 1])));
+/// assert_eq!(layer.http.headers, Some(vec!["x-user".into(), "x-password".into()]));
+/// assert_eq!(layer.log_file, Some(temp_dir().join("app.log")));
+/// # Ok(())
+/// # }
+/// ```
+///
+/// The macro returns `Result<<C as Config>::Layer, Error>`. Fields that are not
+/// mentioned are `None`/empty, i.e. default values are *not* applied. To get
+/// your actual configuration, use the layer like any other, e.g. pass it to
+/// [`Builder::preloaded`], or combine it with other layers via
+/// [`Layer::with_fallback`] and [`Layer::default_values`].
+///
+///
+/// # Syntax
+///
+/// Inside the braces, there is a comma separated list of entries. Each entry
+/// has the form `field: value` where `value` is one of:
+///
+/// - **An expression**, e.g. `"127.0.0.1"`, `8080` or `my_var`. The value is
+///   *deserialized* into the field, just like a value from a configuration
+///   file. That means the value does not need to have the exact type of the
+///   field, e.g. a string can be used for an `IpAddr` or `PathBuf` field.
+///   Field validators and `deserialize_with` are applied as well. The
+///   expression needs to implement [`IntoDeserializer`], which is the case
+///   for all primitive types, strings, `Vec`, `HashMap`, `BTreeMap` and some
+///   more.
+/// - **An array**, e.g. `["foo", "bar"]`, deserialized as a sequence. Items
+///   can be any expression implementing [`IntoDeserializer`], or again an
+///   array or map, e.g. `[[1, 2], [3]]`.
+/// - **A map**, e.g. `{ "foo": 1, "bar": 2 }`, deserialized as a map
+///   (preserving the order of entries). Keys need to be literals, values can
+///   be anything that array items can be, e.g.
+///   `{ "admins": ["anna"], "guests": [] }`. `{}` is an empty map.
+/// - **A nested configuration**, e.g. `{ port: 8080, bind: "::1" }`, using the
+///   same syntax recursively. Distinguished from a map by the field names
+///   being identifiers, not literals.
+/// - **A raw Rust value** `#(expr)`, e.g. `#(PathBuf::from("/tmp"))`. The
+///   expression is assigned as is (i.e. `Some(expr)`) and needs to have the
+///   exact type of the field. This is *not* deserialized, so field validators
+///   and `deserialize_with` are not applied! Use [`Layer::validate`] if you
+///   need to run field validators. This does not work for nested
+///   configurations.
+///
+/// All items of one array need to have the same Rust type, e.g. `[1.5, 2.0]`
+/// and not `[1.5, 2]`. The same is true for all keys and for all values of
+/// one map. For this purpose, a nested array is a `Vec`, so `[[1, 2], my_vec]`
+/// works. A nested map has its own type though, so it cannot be mixed with
+/// expressions of type `HashMap`.
+///
+/// Integer literals without type suffix are `i32` as usual, but are converted
+/// to the field's type when deserialized (failing if the value doesn't fit).
+/// For values outside the `i32` range, add a suffix, e.g. `5_000_000_000u64`.
+///
+///
+/// # Errors
+///
+/// Misspelled or duplicate field names result in compile errors. An error is
+/// returned at runtime if a value cannot be deserialized into its field,
+/// including when a field validator fails.
+///
+/// Note that this macro accesses the fields of the layer types, which have
+/// the same visibility as your configuration struct. So you can only use
+/// this macro where your configuration type is visible.
+///
+/// [`IntoDeserializer`]: crate::serde::de::IntoDeserializer
+pub use confique_macro::layer;
 
 
 /// A configuration object that can be deserialized in layers via `serde`.

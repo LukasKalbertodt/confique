@@ -93,6 +93,7 @@ fn gen_layer_mod(input: &ir::Input) -> TokenStream {
         is_empty_exprs,
         is_complete_exprs,
         validate_exprs,
+        deserialize_into_methods,
         extra_items,
     } = parts;
 
@@ -164,6 +165,12 @@ fn gen_layer_mod(input: &ir::Input) -> TokenStream {
                 }
             }
 
+            #[automatically_derived]
+            #[allow(non_snake_case)]
+            impl #struct_name {
+                #( #deserialize_into_methods )*
+            }
+
             #extra_items
         }
     }
@@ -181,6 +188,10 @@ struct Parts {
     is_empty_exprs: Vec<TokenStream>,
     is_complete_exprs: Vec<TokenStream>,
     validate_exprs: Vec<TokenStream>,
+
+    /// The `deserialize_into_{field}` methods of the layer, one per field.
+    /// Currently only used by `layer!`.
+    deserialize_into_methods: Vec<TokenStream>,
     extra_items: TokenStream,
 }
 
@@ -228,6 +239,12 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
                     #path,
                 )?;
             });
+            parts.deserialize_into_methods.push(gen_deserialize_into_method(
+                field_name,
+                &field_visibility,
+                &quote! { confique::serde::Deserialize::deserialize },
+                false,
+            ));
         },
 
 
@@ -366,12 +383,16 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
                 });
             }
 
+            parts.deserialize_into_methods.push(
+                gen_deserialize_into_method(field_name, &field_visibility, &deserialize_fn, true)
+            );
+
             // Code for `Layer::default_values()`
             parts.default_exprs.push(match kind {
                 LeafKind::Required { default: Some(default), .. } => {
                     let msg = format!("default config value for `{qualified_name}` \
                         cannot be deserialized");
-                    let expr = default_value_to_deserializable_expr(&default);
+                    let expr = deserializable_expr(&default);
                     quote! {
                         Option::Some(
                             #deserialize_fn(confique::internal::into_deserializer(#expr))
@@ -416,10 +437,46 @@ fn layer_names(original_name: &Ident) -> (Ident, Ident) {
     )
 }
 
-/// Generates a Rust expression from the default value that implemenets
-/// `serde::de::IntoDeserializer`.
-fn default_value_to_deserializable_expr(expr: &ir::Expr) -> TokenStream {
+/// Returns the name of the layer's method that deserializes into the given
+/// field.
+pub(crate) fn deserialize_into_method_name(field_name: &Ident) -> Ident {
+    format_ident!("deserialize_into_{}", field_name.unraw(), span = field_name.span())
+}
+
+/// Generates the `deserialize_into_{field}` method of the layer for one field:
+/// it deserializes a value via `deserialize_fn` and stores it in that field.
+fn gen_deserialize_into_method(
+    field_name: &Ident,
+    visibility: &TokenStream,
+    deserialize_fn: &TokenStream,
+    is_leaf: bool,
+) -> TokenStream {
+    let method_name = deserialize_into_method_name(field_name);
+    let mut value = quote! { #deserialize_fn(deserializer)? };
+    if is_leaf {
+        value = quote! { std::option::Option::Some(#value) };
+    }
+
+    quote! {
+        #[doc(hidden)]
+        #visibility fn #method_name<'de, D>(
+            &mut self,
+            deserializer: D,
+        ) -> std::result::Result<(), D::Error>
+        where
+            D: confique::serde::Deserializer<'de>,
+        {
+            self.#field_name = #value;
+            std::result::Result::Ok(())
+        }
+    }
+}
+
+/// Generates a Rust expression from the value (a default value or a value in
+/// `layer!`) that implements `serde::de::IntoDeserializer`.
+pub(crate) fn deserializable_expr(expr: &ir::Expr) -> TokenStream {
     match expr {
+        ir::Expr::Rust(tokens) => tokens.clone(),
         ir::Expr::Str(lit) => quote! { #lit },
         ir::Expr::Int(lit, None) => quote! { #lit },
         ir::Expr::Int(lit, Some(ty)) => {
@@ -440,13 +497,13 @@ fn default_value_to_deserializable_expr(expr: &ir::Expr) -> TokenStream {
         ir::Expr::Array(arr) => {
             // We use `Vec` and not arrays, as nested arrays can have different
             // lengths and thus would have different types.
-            let items = arr.iter().map(default_value_to_deserializable_expr);
+            let items = arr.iter().map(deserializable_expr);
             quote! { std::vec![ #(#items),* ] }
         },
         ir::Expr::Map(entries) => {
             let items = entries.iter().map(|e| {
-                let key = default_value_to_deserializable_expr(&e.key.clone().into());
-                let value = default_value_to_deserializable_expr(&e.value);
+                let key = deserializable_expr(&e.key.clone().into());
+                let value = deserializable_expr(&e.value);
                 quote! { (#key, #value) }
             });
             quote! { confique::internal::MapIntoDeserializer(std::vec![ #(#items),* ]) }

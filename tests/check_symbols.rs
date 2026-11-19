@@ -85,3 +85,19 @@ where
 
 #[test]
 fn compiles() {}
+
+#[test]
+fn layer_macro() {
+    let x = 3;
+    let _ = confique::layer!(Conf {
+        title: "foo",
+        http: { port: 8080, bind: "::1", user: #(std::string::String::new()) },
+        misc: {
+            list: [],
+            empty_array: [x, 1],
+            empty_map: {},
+            map: { "a": x, "b": std::convert::identity::<u32>(1) },
+            validated_list: std::vec![1, x],
+        },
+    });
+}
