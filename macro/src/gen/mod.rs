@@ -178,7 +178,7 @@ struct Parts {
     is_complete_exprs: Vec<TokenStream>,
     validate_exprs: Vec<TokenStream>,
 
-    /// The `deserialize_into_{field}` methods of the layer, one per field.
+    /// The `__confique_deserialize_into_{field}` methods of the layer, one per field.
     /// Currently only used by `layer!`.
     deserialize_into_methods: Vec<TokenStream>,
 
@@ -445,10 +445,10 @@ fn layer_name(input: &ir::Input) -> Ident {
 /// Returns the name of the layer's method that deserializes into the given
 /// field.
 pub(crate) fn deserialize_into_method_name(field_name: &Ident) -> Ident {
-    format_ident!("deserialize_into_{}", field_name.unraw(), span = field_name.span())
+    format_ident!("__confique_deserialize_into_{}", field_name.unraw(), span = field_name.span())
 }
 
-/// Generates the `deserialize_into_{field}` method of the layer for one field:
+/// Generates the `__confique_deserialize_into_{field}` method of the layer for one field:
 /// it deserializes a value via `deserialize_fn` and stores it in that field.
 fn gen_deserialize_into_method(
     field_name: &Ident,

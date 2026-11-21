@@ -175,7 +175,7 @@ impl Context {
                     });
                 }
 
-                // The layer has a `deserialize_into_{field}` method for every
+                // The layer has a `__confique_deserialize_into_{field}` method for every
                 // field. The field access before that has no effect, but for
                 // an unknown field, it leads to an additional and much better
                 // compiler error.
