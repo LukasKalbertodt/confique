@@ -138,7 +138,6 @@
 //!     foo: f32,
 //! }
 //!
-//! type ConfLayer = <Conf as Config>::Layer;
 //! let from_file: ConfLayer = File::with_format("/etc/foo/config", FileFormat::Toml)
 //!     .required()
 //!     .load()?;

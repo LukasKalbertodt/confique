@@ -14,8 +14,6 @@ fn layer_props() {
         bar: u32,
     }
 
-    type FooLayer = <Foo as Config>::Layer;
-
     let foo_layer = FooLayer { bar: Some(1) };
     assert_eq!(
         format!("{foo_layer:?}"),

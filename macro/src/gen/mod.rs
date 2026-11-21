@@ -1,4 +1,4 @@
-use proc_macro2::{Span, TokenStream};
+use proc_macro2::TokenStream;
 use quote::{format_ident, quote, quote_spanned};
 use syn::{Ident, ext::IdentExt, spanned::Spanned};
 
@@ -9,19 +9,19 @@ mod meta;
 
 /// The main function to generate the output token stream from the parse IR.
 pub(crate) fn gen(input: ir::Input) -> TokenStream {
-    let layer_mod = gen_layer_mod(&input);
+    let layer = gen_layer(&input);
     let config_impl = gen_config_impl(&input);
 
     quote! {
         #config_impl
-        #layer_mod
+        #layer
     }
 }
 
 /// Generates the `impl Config for ... { ... }`.
 fn gen_config_impl(input: &ir::Input) -> TokenStream {
     let name = &input.name;
-    let (layer_mod_name, layer_struct_name) = layer_names(&input.name);
+    let layer_name = layer_name(&input.name);
 
     let field_names = input.fields.iter().map(|f| &f.name);
     let from_exprs = input.fields.iter().map(|f| {
@@ -58,7 +58,7 @@ fn gen_config_impl(input: &ir::Input) -> TokenStream {
     quote! {
         #[automatically_derived]
         impl confique::Config for #name {
-            type Layer = #layer_mod_name::#layer_struct_name;
+            type Layer = #layer_name;
 
             fn from_layer(layer: Self::Layer) -> std::result::Result<Self, confique::Error> {
                 let out = Self {
@@ -73,9 +73,8 @@ fn gen_config_impl(input: &ir::Input) -> TokenStream {
     }
 }
 
-/// Generates the whole `mod ... { ... }` that defines the layer type and
-/// related items.
-fn gen_layer_mod(input: &ir::Input) -> TokenStream {
+/// Generates the layer type and its impls.
+fn gen_layer(input: &ir::Input) -> TokenStream {
     // Iterate through all fields, collecting field-relevant parts to be sliced
     // in the various methods.
     let mut parts = Parts::default();
@@ -98,79 +97,70 @@ fn gen_layer_mod(input: &ir::Input) -> TokenStream {
     } = parts;
 
     // Prepare some values for interpolation
-    let (mod_name, struct_name) = layer_names(&input.name);
+    let struct_name = layer_name(&input.name);
     let visibility = &input.visibility;
     let layer_attrs = &input.layer_attrs;
-    let struct_visibility = inner_visibility(&input.visibility, Span::call_site());
-    let module_doc = format!(
-        "*Generated* by `confique`: helpers to implement `Config` for [`{}`].\n\
-            \n\
-            Do not use directly! Only use via the `Config` and `Layer` traits \
-            and what's explained in the confique documentation. \
-            Any other parts of this module cannot be relied on and are not part \
-            of the semver guarantee of `confique`.",
+    let doc = format!(
+        "Layer type of [`{}`], *generated* by `confique`. \
+            See [`confique::Layer`] for more information.",
         input.name.unraw(),
     );
 
     quote! {
-        #[doc = #module_doc]
-        #visibility mod #mod_name {
-            #![allow(missing_docs)]
-            use super::*;
+        #[doc = #doc]
+        #[allow(missing_docs)]
+        #[derive(confique::serde::Deserialize)]
+        #[serde(crate = "confique::serde")]
+        #( #[ #layer_attrs ])*
+        #visibility struct #struct_name {
+            #( #struct_fields )*
+        }
 
-            #[derive(confique::serde::Deserialize)]
-            #[serde(crate = "confique::serde")]
-            #( #[ #layer_attrs ])*
-            #struct_visibility struct #struct_name {
-                #( #struct_fields )*
-            }
-
-            #[automatically_derived]
-            impl confique::Layer for #struct_name where #( #nested_bounds, )* {
-                fn empty() -> Self {
-                    Self {
-                        #( #field_names: #empty_exprs, )*
-                    }
-                }
-
-                fn default_values() -> Self {
-                    Self {
-                        #( #field_names: #default_exprs, )*
-                    }
-                }
-
-                fn from_env() -> std::result::Result<Self, confique::Error> {
-                    std::result::Result::Ok(Self {
-                        #( #field_names: #from_env_exprs, )*
-                    })
-                }
-
-                fn with_fallback(self, fallback: Self) -> Self {
-                    Self {
-                        #( #field_names: #fallback_exprs, )*
-                    }
-                }
-
-                fn is_empty(&self) -> bool {
-                    true #(&& #is_empty_exprs)*
-                }
-
-                fn is_complete(&self) -> bool {
-                    true #(&& #is_complete_exprs)*
-                }
-
-                fn validate(&self) -> std::result::Result<(), confique::Error> {
-                    #( #validate_exprs )*
-                    std::result::Result::Ok(())
+        #[automatically_derived]
+        impl confique::Layer for #struct_name where #( #nested_bounds, )* {
+            fn empty() -> Self {
+                Self {
+                    #( #field_names: #empty_exprs, )*
                 }
             }
 
-            #[automatically_derived]
-            #[allow(non_snake_case)]
-            impl #struct_name {
-                #( #deserialize_into_methods )*
-                #layer_methods
+            fn default_values() -> Self {
+                Self {
+                    #( #field_names: #default_exprs, )*
+                }
             }
+
+            fn from_env() -> std::result::Result<Self, confique::Error> {
+                std::result::Result::Ok(Self {
+                    #( #field_names: #from_env_exprs, )*
+                })
+            }
+
+            fn with_fallback(self, fallback: Self) -> Self {
+                Self {
+                    #( #field_names: #fallback_exprs, )*
+                }
+            }
+
+            fn is_empty(&self) -> bool {
+                true #(&& #is_empty_exprs)*
+            }
+
+            fn is_complete(&self) -> bool {
+                true #(&& #is_complete_exprs)*
+            }
+
+            fn validate(&self) -> std::result::Result<(), confique::Error> {
+                #( #validate_exprs )*
+                std::result::Result::Ok(())
+            }
+        }
+
+        #[automatically_derived]
+        #[allow(non_snake_case)]
+        impl #struct_name {
+            #( #deserialize_into_methods )*
+            #layer_methods
         }
     }
 }
@@ -199,7 +189,7 @@ struct Parts {
 
 fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
     let struct_name = &input.name;
-    let (_, layer_struct_name) = layer_names(struct_name);
+    let layer_struct_name = layer_name(struct_name);
     let field_name = &f.name;
     parts.field_names.push(field_name.clone());
 
@@ -210,7 +200,8 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
 
     // We have to use the span of the field's name here so that error
     // messages from the `derive(serde::Deserialize)` have the correct span.
-    let field_visibility = inner_visibility(&input.visibility, field_name.span());
+    let visibility = &input.visibility;
+    let field_visibility = quote_spanned! {field_name.span()=> #visibility };
 
 
     match &f.kind {
@@ -300,11 +291,10 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
                     "Runs all validators of the field `{unraw_field_name}` (specified via \
                         `#[config(validate = ...)]`) on the given value.",
                 );
-                let method_visibility = inner_visibility(&input.visibility, Span::call_site());
                 parts.layer_methods.extend(quote! {
                     #[doc = #doc]
                     #[inline(never)]
-                    #method_visibility fn #validate_fn_name(
+                    #visibility fn #validate_fn_name(
                         v: &#inner_ty,
                     ) -> std::result::Result<(), confique::Error> {
                         #validate_inner
@@ -446,15 +436,9 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
     }
 }
 
-/// Returns the names of the module and struct for the layer type:
-/// `(mod_name, struct_name)`.
-fn layer_names(original_name: &Ident) -> (Ident, Ident) {
-    use heck::ToSnakeCase;
-    let name = original_name.unraw();
-    (
-        format_ident!("confique_{}_layer", name.to_string().to_snake_case()),
-        format_ident!("{name}Layer"),
-    )
+/// Returns the name of the layer type.
+fn layer_name(original_name: &Ident) -> Ident {
+    format_ident!("{}Layer", original_name.unraw())
 }
 
 /// Returns the name of the layer's method that deserializes into the given
@@ -533,37 +517,5 @@ fn value_expr(expr: &ir::Expr) -> TokenStream {
     match expr {
         ir::Expr::Array(_) | ir::Expr::Map(_) => out,
         _ => quote! { confique::internal::Value::new(#out) },
-    }
-}
-
-/// Returns tokens defining the visibility of the items in the inner module.
-fn inner_visibility(outer: &syn::Visibility, span: Span) -> TokenStream {
-    match outer {
-        // These visibilities can be used as they are. No adjustment needed.
-        syn::Visibility::Public(_) => quote_spanned! {span=> #outer },
-        syn::Visibility::Restricted(r) if r.path.is_ident("crate") && r.in_token.is_none() => {
-            quote_spanned! {span=> #outer }
-        },
-
-        // The inherited one is relative to the parent module.
-        syn::Visibility::Inherited => quote_spanned! {span=> pub(super) },
-
-        // For `pub(crate)`
-        syn::Visibility::Restricted(r) if r.path.is_ident("crate") && r.in_token.is_none() => {
-            quote_spanned! {span=> pub(crate) }
-        },
-
-        // If the path in the `pub(in <path>)` visibility is absolute, we can
-        // use it like that as well.
-        syn::Visibility::Restricted(r) if r.path.leading_colon.is_some() => {
-            quote_spanned! {span=> #outer }
-        },
-
-        // But in the case `pub(in <path>)` with a relative path, we have to
-        // prefix `super::`.
-        syn::Visibility::Restricted(r) => {
-            let path = &r.path;
-            quote_spanned! {span=> pub(in super::#path) }
-        }
     }
 }
