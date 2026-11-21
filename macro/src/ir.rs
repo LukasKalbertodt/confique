@@ -10,6 +10,8 @@ pub(crate) struct Input {
     pub(crate) layer_attrs: Vec<TokenStream>,
     pub(crate) validate: Option<syn::Path>,
     pub(crate) name: syn::Ident,
+    /// Name of the layer type, if specified via `layer_name`.
+    pub(crate) layer_name: Option<syn::Ident>,
     pub(crate) fields: Vec<Field>,
 }
 

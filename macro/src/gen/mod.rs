@@ -21,7 +21,7 @@ pub(crate) fn gen(input: ir::Input) -> TokenStream {
 /// Generates the `impl Config for ... { ... }`.
 fn gen_config_impl(input: &ir::Input) -> TokenStream {
     let name = &input.name;
-    let layer_name = layer_name(&input.name);
+    let layer_name = layer_name(input);
 
     let field_names = input.fields.iter().map(|f| &f.name);
     let from_exprs = input.fields.iter().map(|f| {
@@ -97,7 +97,7 @@ fn gen_layer(input: &ir::Input) -> TokenStream {
     } = parts;
 
     // Prepare some values for interpolation
-    let struct_name = layer_name(&input.name);
+    let struct_name = layer_name(input);
     let visibility = &input.visibility;
     let layer_attrs = &input.layer_attrs;
     let doc = format!(
@@ -189,7 +189,7 @@ struct Parts {
 
 fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
     let struct_name = &input.name;
-    let layer_struct_name = layer_name(struct_name);
+    let layer_struct_name = layer_name(input);
     let field_name = &f.name;
     parts.field_names.push(field_name.clone());
 
@@ -436,9 +436,10 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
     }
 }
 
-/// Returns the name of the layer type.
-fn layer_name(original_name: &Ident) -> Ident {
-    format_ident!("{}Layer", original_name.unraw())
+/// Returns the name of the layer type: specified via `layer_name` or
+/// `{name}Layer` by default.
+fn layer_name(input: &ir::Input) -> Ident {
+    input.layer_name.clone().unwrap_or_else(|| format_ident!("{}Layer", input.name.unraw()))
 }
 
 /// Returns the name of the layer's method that deserializes into the given

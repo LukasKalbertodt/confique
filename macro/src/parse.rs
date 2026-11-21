@@ -39,6 +39,7 @@ impl Input {
             layer_attrs: attrs.layer_attrs,
             validate: attrs.validate,
             name: input.ident,
+            layer_name: attrs.layer_name,
             fields,
         })
     }
@@ -50,11 +51,13 @@ impl Input {
 struct StructAttrs {
     layer_attrs: Vec<TokenStream>,
     validate: Option<syn::Path>,
+    layer_name: Option<Ident>,
 }
 
 enum StructAttr {
     LayerAttr(TokenStream),
     Validate(syn::Path),
+    LayerName(Ident),
 }
 
 impl StructAttrs {
@@ -84,6 +87,10 @@ impl StructAttrs {
                         duplicate_if!(out.validate.is_some());
                         out.validate = Some(path);
                     }
+                    StructAttr::LayerName(name) => {
+                        duplicate_if!(out.layer_name.is_some());
+                        out.layer_name = Some(name);
+                    }
                 }
             }
         }
@@ -97,6 +104,7 @@ impl StructAttr {
         match self {
             Self::LayerAttr(_) => "layer_attr",
             Self::Validate(_) => "validate",
+            Self::LayerName(_) => "layer_name",
         }
     }
 }
@@ -110,6 +118,7 @@ impl Parse for StructAttr {
                 Ok(Self::LayerAttr(stream))
             }
             "validate" => parse_eq_value(input).map(Self::Validate),
+            "layer_name" => parse_eq_value(input).map(Self::LayerName),
             _ => Err(syn::Error::new(ident.span(), "unknown confique attribute")),
         }
     }
