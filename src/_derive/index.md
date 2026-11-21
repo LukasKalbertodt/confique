@@ -11,8 +11,7 @@ this macro: nested and leaf fields.
 
 - **Nested fields**: they have to be annotated with `#[config(nested)]` and
   contain a nested configuration object. The type of this field must
-  implement `Config`. As implied by the previous statement, `Option<_>` as
-  type for nested fields is not allowed.
+  implement `Config`. `Option<_>` as type for nested fields is not allowed.
 
 - **Leaf fields**: all fields *not* annotated with `#[config(nested)]`,
   these contain your actual values. The type of such a field has to
