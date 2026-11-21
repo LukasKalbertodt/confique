@@ -95,7 +95,6 @@ fn gen_layer_mod(input: &ir::Input) -> TokenStream {
         validate_exprs,
         deserialize_into_methods,
         layer_methods,
-        extra_items,
     } = parts;
 
     // Prepare some values for interpolation
@@ -172,8 +171,6 @@ fn gen_layer_mod(input: &ir::Input) -> TokenStream {
                 #( #deserialize_into_methods )*
                 #layer_methods
             }
-
-            #extra_items
         }
     }
 }
@@ -195,9 +192,9 @@ struct Parts {
     /// Currently only used by `layer!`.
     deserialize_into_methods: Vec<TokenStream>,
 
-    /// Other inherent methods of the layer type (e.g. `validate_{field}`).
+    /// Other inherent methods of the layer type (e.g. `validate_{field}` and
+    /// private helpers).
     layer_methods: TokenStream,
-    extra_items: TokenStream,
 }
 
 fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
@@ -260,7 +257,8 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
 
             let validate_fn_name = quote::format_ident!("validate_{unraw_field_name}");
 
-            // This has an ugly name to avoid clashing with imported names.
+            // This has an ugly name to avoid clashing with user-defined methods
+            // of the layer type.
             let deserialize_fn_name
                 = quote::format_ident!("__confique_deserialize_direct_{unraw_field_name}");
 
@@ -268,7 +266,8 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
                 <#inner_ty as confique::serde::Deserialize>::deserialize
             };
 
-            // We sometimes emit extra helper functions to avoid code duplication.
+            // We sometimes emit extra helper functions (private associated
+            // functions of the layer type) to avoid code duplication.
             // Validation should be part of the serialization. `validate_fn` is
             // `Some(path)` to the public `validate_{field}` method of the layer
             // type if there are any validators. `deserialize_fn` is
@@ -313,7 +312,8 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
                     }
                 });
 
-                parts.extra_items.extend(quote! {
+                parts.layer_methods.extend(quote! {
+                    #[doc(hidden)]
                     fn #deserialize_fn_name<'de, D>(
                         deserializer: D,
                     ) -> std::result::Result<#inner_ty, D::Error>
@@ -329,7 +329,7 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
 
                 (
                     Some(quote! { #layer_struct_name::#validate_fn_name }),
-                    quote! { #deserialize_fn_name },
+                    quote! { #layer_struct_name::#deserialize_fn_name },
                 )
             } else {
                 // If there is no validation, we will not create a custom
@@ -352,7 +352,8 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
                     // returns `Some`.
                     let fn_name
                         = quote::format_ident!("__confique_deserialize_some_{unraw_field_name}");
-                    parts.extra_items.extend(quote! {
+                    parts.layer_methods.extend(quote! {
+                        #[doc(hidden)]
                         fn #fn_name<'de, D>(
                             deserializer: D,
                         ) -> std::result::Result<Option<#inner_ty>, D::Error>
@@ -363,7 +364,7 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
                         }
                     });
 
-                    let attr_value = fn_name.to_string();
+                    let attr_value = format!("{layer_struct_name}::{fn_name}");
                     quote! {
                         #[serde(default, deserialize_with = #attr_value)]
                     }
