@@ -4,8 +4,25 @@ All notable changes to this project will be documented in this file.
 
 
 ## [Unreleased]
+
+## [0.5.0] - 2026-11-22
+- **Breaking**: ⭐ The layer type is now generated next to your config struct as `{Name}Layer`, with the same visibility (previously inside a generated module, e.g. `confique_conf_layer::ConfLayer`). It is now part of the public API and can be named and used directly.
+  - Add `layer_name` attribute to choose a different name, e.g. `#[config(layer_name = MyLayer)]`.
+  - Add associated functions `validate_{field}` (runs all validators of that field) and `deserialize_{field}` (deserializes a value like confique does, i.e. with `deserialize_with` and validators) to the layer type for every leaf field. Useful for manually constructed layers or e.g. a `clap` value parser.
+  - This also fixes `super::` paths in attributes, `pub(self)`/`pub(in ...)` visibilities and configs defined inside function bodies.
+- **Breaking**: Rename `Builder::preloaded` to `Builder::layer`
+- **Breaking**: `null` values now always mean "not set" (`None`). Before, for fields with `validate` or `deserialize_with`, `null` was passed to the field's deserializer (and thus to your `deserialize_with` function), which usually resulted in an error.
+- **Breaking**: `list_by_sep` (and `list_by_comma` etc.) now return an empty collection for an empty string. Before, they tried to parse `""` as one list element: for e.g. `Vec<String>` that resulted in `vec![""]`, for e.g. `Vec<u16>` it failed, so the env var was treated as not set. Now, `""` always results in an empty list, overriding lower layers and default values.
+- **Breaking**: Using `nested` and `parse_env` on the same field is now a compile error (`parse_env` was silently ignored)
+- **Breaking**: Mark `FileFormat` as `#[non_exhaustive]`
+- **Breaking**: Raise MSRV to 1.88
+- **Breaking**: Multi-line doc strings (e.g. `#[doc = "a\nb"]`) are split into lines in `META` (`Field::doc`, `Meta::doc`). Before, they resulted in malformed templates.
+- ⭐ Add `_derive` module (just in the docs) with detailed documentation for all `#[config(...)]` attributes
 - Add `_example` module (just in the docs) to show what the proc macro generates
-- Add `validate_{field}` associated functions to the generated layer type for fields with `validate` attributes. This allows running field validators manually, e.g. for manually constructed layers.
+- Infer the type of number literals in default values for `Box<[T]>`, `Rc<[T]>` and `Arc<[T]>` fields
+- Include the env var name in error messages of `parse_env` functions
+- Fix missing `#` separator line in templates between the env var line and the default value line for fields without doc comments
+- Update `toml` dependency to 1.x
 
 ## [0.4.1] - 2026-11-19
 - ⭐ Add `layer!` and `config!` macros to conveniently build a layer or config in code, e.g. `layer!(Conf { http: { port: 8080, bind: "::1" } })`
@@ -164,7 +181,8 @@ All notable changes to this project will be documented in this file.
 - Everything.
 
 
-[Unreleased]: https://github.com/LukasKalbertodt/confique/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/LukasKalbertodt/confique/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/LukasKalbertodt/confique/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/LukasKalbertodt/confique/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/LukasKalbertodt/confique/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/LukasKalbertodt/confique/compare/v0.3.0...v0.3.1
