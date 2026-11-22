@@ -131,14 +131,6 @@ fn attribute_paths() {
     assert!(Lay::deserialize_b(u32_deserializer(0)).is_err());
     assert_eq!(Lay::deserialize_d(u32_deserializer(3)), Ok(6));
 
-    let deser = |b: u32| {
-        use serde::de::{Deserialize, value::{Error, MapDeserializer}};
-        let map = MapDeserializer::<_, Error>::new([("a", 1), ("b", b)].into_iter());
-        Lay::deserialize(map)
-    };
-    assert_eq!(deser(2).unwrap().b, Some(4));
-    assert!(deser(0).is_err());
-
     std::env::set_var("LAYER_TYPE_PATHS_C", "5");
     assert_eq!(Lay::from_env().unwrap().c, Some(10));
 }

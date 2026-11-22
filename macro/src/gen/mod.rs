@@ -351,8 +351,10 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
                 // set the serde `deserialize_with` attribute.
                 let attr = if deserialize_with.is_some() || has_validators {
                     // Since the struct field is `Option<T>`, we need to create
-                    // another wrapper deserialization function, that always
-                    // returns `Some`.
+                    // another wrapper deserialization function. It goes through
+                    // `Option`'s `Deserialize` impl to get serde's standard
+                    // handling: `null` results in `None` and only other values
+                    // are passed to the field's deserialization function.
                     let fn_name
                         = quote::format_ident!("__confique_deserialize_some_{unraw_field_name}");
                     parts.layer_methods.extend(quote! {
@@ -363,7 +365,21 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
                         where
                             D: confique::serde::Deserializer<'de>,
                         {
-                            #deserialize_fn(deserializer).map(Option::Some)
+                            struct __ConfiqueWrap(#inner_ty);
+                            impl<'a> confique::serde::Deserialize<'a> for __ConfiqueWrap {
+                                fn deserialize<D2>(
+                                    deserializer: D2,
+                                ) -> std::result::Result<Self, D2::Error>
+                                where
+                                    D2: confique::serde::Deserializer<'a>,
+                                {
+                                    #deserialize_fn(deserializer).map(__ConfiqueWrap)
+                                }
+                            }
+
+                            <std::option::Option<__ConfiqueWrap>
+                                as confique::serde::Deserialize>::deserialize(deserializer)
+                                .map(|o| o.map(|w| w.0))
                         }
                     });
 

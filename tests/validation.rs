@@ -703,6 +703,34 @@ fn field_validate_methods() {
     assert_err_contains(Layer::validate_opt(&"jürgen".into()), "non-ASCII characters");
 }
 
+/// `null` means "unset", regardless of `validate` and `deserialize_with` (like
+/// for plain fields).
+#[cfg(feature = "yaml")]
+#[test]
+fn null_is_unset() {
+    fn deser_panic<'de, D: serde::Deserializer<'de>>(_: D) -> Result<u32, D::Error> {
+        panic!("should not be called for null");
+    }
+
+    #[derive(Config)]
+    #[config(layer_attr(derive(PartialEq, Debug)))]
+    #[allow(dead_code)]
+    struct Conf {
+        plain: u32,
+        #[config(validate(*validated > 0, "zero"))]
+        validated: u32,
+        #[config(validate(*validated_opt > 0, "zero"))]
+        validated_opt: Option<u32>,
+        #[config(deserialize_with = deser_panic)]
+        deser: u32,
+    }
+
+    type Layer = <Conf as Config>::Layer;
+    let layer: Layer = serde_yaml::from_str("plain:\nvalidated: ~\nvalidated_opt: null\ndeser:")
+        .unwrap();
+    assert_eq!(layer, Layer::empty());
+}
+
 #[track_caller]
 fn assert_err_contains<T, E: std::fmt::Display>(r: Result<T, E>, expected: &str) {
     let e = r.map(|_| ()).unwrap_err();

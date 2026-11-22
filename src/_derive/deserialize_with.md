@@ -13,6 +13,9 @@ implement `Deserialize`, or to accept a different representation than the
 default one. serde is reexported as [`confique::serde`][crate::serde], so you
 don't need a direct dependency on it.
 
+Unlike with serde, the function is not called for `null` values: as for all
+fields, `null` means the value is not set.
+
 [serde-deser]: https://serde.rs/field-attrs.html#deserialize_with
 
 Example:
