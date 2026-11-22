@@ -1,4 +1,4 @@
-use std::net::IpAddr;
+use std::{net::IpAddr, time::Duration};
 use confique::Config;
 
 /// The root configuration.
@@ -27,4 +27,17 @@ pub struct HttpConf {
     /// Additional headers that are passed through.
     #[config(default = ["x-user", "x-password"])]
     pub headers: Vec<String>,
+
+    /// Timeout for requests, in seconds.
+    #[config(default = 30, deserialize_with = duration_from_secs)]
+    pub timeout: Duration,
+}
+
+/// Deserializes a `Duration` from a number of seconds.
+pub fn duration_from_secs<'de, D>(deserializer: D) -> Result<Duration, D::Error>
+where
+    D: confique::serde::Deserializer<'de>,
+{
+    let secs = <u64 as confique::serde::Deserialize>::deserialize(deserializer)?;
+    Ok(Duration::from_secs(secs))
 }
