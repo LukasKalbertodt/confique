@@ -60,13 +60,26 @@ mod a {
         }
 
         #[derive(Config)]
+        pub(in crate) struct InCrate {
+            #[config(validate(*x > 0, "zero"))]
+            x: u32,
+        }
+
+        #[derive(Config)]
         struct Private {
+            #[config(validate(*x > 0, "zero"))]
+            x: u32,
+        }
+
+        #[derive(Config)]
+        pub(self) struct SelfVis {
             #[config(validate(*x > 0, "zero"))]
             x: u32,
         }
 
         pub fn check_private() {
             check_layer!(Private, PrivateLayer);
+            check_layer!(SelfVis, SelfVisLayer);
         }
     }
 
@@ -80,6 +93,7 @@ mod a {
 fn visibility() {
     check_layer!(a::b::Pub, a::b::PubLayer);
     check_layer!(a::b::Crate, a::b::CrateLayer);
+    check_layer!(a::b::InCrate, a::b::InCrateLayer);
     a::check_restricted();
     a::b::check_private();
 }
