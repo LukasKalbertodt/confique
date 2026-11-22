@@ -35,6 +35,16 @@ So it won't work if you rename symbols or use full paths.
   the (unqualified) symbol `Option` must be in scope and refer to
   `std::option::Option`.
 
+## Generated layer type
+
+The derive generates a layer type next to your struct, named `{Name}Layer` by
+default (see [`layer_name`](crate::_derive::layer_name)) and with the same
+visibility as your struct. Apart from implementing [`Layer`](crate::Layer), it
+has an associated function `deserialize_{field}` for each leaf field, which
+deserializes a value for that field like confique does when loading a layer,
+i.e. using [`deserialize_with`](crate::_derive::deserialize_with) and running
+[validators](crate::_derive::validate).
+
 
 # Attributes
 

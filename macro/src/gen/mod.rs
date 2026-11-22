@@ -247,24 +247,11 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
             let inner_ty = kind.inner_ty();
 
             let validate_fn_name = quote::format_ident!("validate_{unraw_field_name}");
+            let deserialize_fn_name = quote::format_ident!("deserialize_{unraw_field_name}");
 
-            // This has an ugly name to avoid clashing with user-defined methods
-            // of the layer type.
-            let deserialize_fn_name
-                = quote::format_ident!("__confique_deserialize_direct_{unraw_field_name}");
-
-            let default_deserialize_path = quote! {
-                <#inner_ty as confique::serde::Deserialize>::deserialize
-            };
-
-            // We sometimes emit extra helper functions (private associated
-            // functions of the layer type) to avoid code duplication.
-            // Validation should be part of the serialization. `validate_fn` is
-            // `Some(path)` to the public `validate_{field}` method of the layer
-            // type if there are any validators. `deserialize_fn` is
-            // a token stream that represents a callable function that deserializes
-            // `inner_ty`.
-            let (validate_fn, deserialize_fn) = if validate.len() > 0 {
+            // The public `validate_{field}` method, if there are any validators.
+            // `validate_fn` is `Some(path)` to that method.
+            let validate_fn = if validate.len() > 0 {
                 let validate_inner = validate.iter().map(|validator| match validator {
                     ir::FieldValidator::Fn(f) => quote_spanned! {f.span() =>
                         confique::internal::validate_field(v, &#f, #path)?;
@@ -283,10 +270,6 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
                     },
                 }).collect::<TokenStream>();
 
-                let deser_fn = deserialize_with.as_ref()
-                    .map(|f| quote!( #f ))
-                    .unwrap_or_else(|| default_deserialize_path.clone());
-
                 let doc = format!(
                     "Runs all validators of the field `{unraw_field_name}` (specified via \
                         `#[config(validate = ...)]`) on the given value.",
@@ -302,34 +285,58 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
                     }
                 });
 
-                parts.layer_methods.extend(quote! {
-                    #[doc(hidden)]
-                    fn #deserialize_fn_name<'de, D>(
-                        deserializer: D,
-                    ) -> std::result::Result<#inner_ty, D::Error>
-                    where
-                        D: confique::serde::Deserializer<'de>,
-                    {
-                        let out = #deser_fn(deserializer)?;
-                        #layer_struct_name::#validate_fn_name(&out)
-                            .map_err(<D::Error as confique::serde::de::Error>::custom)?;
-                        std::result::Result::Ok(out)
-                    }
-                });
-
-                (
-                    Some(quote! { #layer_struct_name::#validate_fn_name }),
-                    quote! { #layer_struct_name::#deserialize_fn_name },
-                )
+                Some(quote! { #layer_struct_name::#validate_fn_name })
             } else {
-                // If there is no validation, we will not create a custom
-                // deserialization function for this, so we either use `T::deserialize`
-                // or, if set, the specified deserialization function.
-                let deser = deserialize_with.as_ref()
-                    .map(|f| quote! { #f })
-                    .unwrap_or(default_deserialize_path);
-                (None, deser)
+                None
             };
+
+            // The public `deserialize_{field}` method.
+            let deser_fn = match deserialize_with {
+                Some(f) => quote! { #f },
+                None => quote! { <#inner_ty as confique::serde::Deserialize>::deserialize },
+            };
+            let body = match &validate_fn {
+                None => quote! { #deser_fn(deserializer) },
+                Some(validate_fn) => quote! {
+                    let out = #deser_fn(deserializer)?;
+                    #validate_fn(&out).map_err(<D::Error as confique::serde::de::Error>::custom)?;
+                    std::result::Result::Ok(out)
+                },
+            };
+            let doc = {
+                let deser_desc = match deserialize_with {
+                    // Token streams are stringified with spaces around `::` etc.
+                    Some(f) => format!(
+                        "`{}` (specified via `deserialize_with`)",
+                        quote!(#f).to_string().replace(' ', ""),
+                    ),
+                    None => "`serde::Deserialize::deserialize`".into(),
+                };
+                let action = match &validate_fn {
+                    Some(_) => format!(
+                        "calls {deser_desc} and then validates the value via \
+                            [`Self::{validate_fn_name}`]",
+                    ),
+                    None => format!("simply calls {deser_desc}"),
+                };
+
+                format!(
+                    "Deserializes a value for the field `{unraw_field_name}` like confique does \
+                        when loading a layer: {action}.",
+                )
+            };
+            parts.layer_methods.extend(quote! {
+                #[doc = #doc]
+                #visibility fn #deserialize_fn_name<'de, D>(
+                    deserializer: D,
+                ) -> std::result::Result<#inner_ty, D::Error>
+                where
+                    D: confique::serde::Deserializer<'de>,
+                {
+                    #body
+                }
+            });
+            let deserialize_fn = quote! { #layer_struct_name::#deserialize_fn_name };
 
 
             // Struct field definition
