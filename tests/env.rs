@@ -104,3 +104,22 @@ fn empty_error_is_unset() {
         validate_parse: None,
     });
 }
+
+#[test]
+fn empty_list() {
+    #[derive(Config)]
+    #[allow(dead_code)]
+    struct Conf {
+        #[config(env = "EMPTY_LIST_NUMS", parse_env = confique::env::parse::list_by_comma)]
+        nums: Vec<u16>,
+
+        #[config(env = "EMPTY_LIST_NAMES", parse_env = confique::env::parse::list_by_comma)]
+        names: Vec<String>,
+    }
+
+    std::env::set_var("EMPTY_LIST_NUMS", "");
+    std::env::set_var("EMPTY_LIST_NAMES", "");
+    let layer = <Conf as Config>::Layer::from_env().unwrap();
+    assert_eq!(layer.nums, Some(vec![]));
+    assert_eq!(layer.names, Some(vec![]));
+}

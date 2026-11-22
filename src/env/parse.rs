@@ -5,6 +5,9 @@ use std::str::FromStr;
 /// Splits the environment variable by separator `SEP`, parses each element
 /// with [`FromStr`] and collects everything via [`FromIterator`].
 ///
+/// An empty string results in an empty collection (and not in one empty
+/// element).
+///
 /// To avoid having to specify the separator via `::<>` syntax, see the
 /// other functions in this module.
 ///
@@ -33,6 +36,9 @@ where
     T: FromStr,
     C: FromIterator<T>,
 {
+    if input.is_empty() {
+        return Ok(std::iter::empty().collect());
+    }
     input.split(SEP).map(T::from_str).collect()
 }
 
