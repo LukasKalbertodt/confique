@@ -626,9 +626,9 @@ fn parse_eq_value<T: syn::parse::Parse>(input: ParseStream) -> Result<T, Error> 
 }
 
 /// Extracts all doc string attributes from the list and returns them as list of
-/// strings (in order).
+/// lines (in order). Multi-line doc strings are split into their lines.
 fn extract_doc(attrs: &mut Vec<syn::Attribute>) -> Vec<String> {
-    extract_attrs(attrs, |attr| {
+    let docs = extract_attrs(attrs, |attr| {
         match &attr.meta {
             syn::Meta::NameValue(syn::MetaNameValue {
                 value: syn::Expr::Lit(syn::ExprLit { lit: syn::Lit::Str(s), .. }),
@@ -637,7 +637,9 @@ fn extract_doc(attrs: &mut Vec<syn::Attribute>) -> Vec<String> {
             }) if path.is_ident("doc") => Some(s.value()),
             _ => None,
         }
-    })
+    });
+
+    docs.iter().flat_map(|s| s.lines()).map(|l| l.to_owned()).collect()
 }
 
 

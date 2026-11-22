@@ -343,3 +343,25 @@ fn int_defaults_outside_i32_range() {
     assert_eq!(def.c, Some(vec![5_000_000_000]));
     assert_eq!(def.d, Some(HashMap::from([("x".into(), 5_000_000_000)])));
 }
+
+#[test]
+fn multi_line_doc_strings() {
+    #[doc = "Root\ndoc"]
+    #[derive(Config)]
+    #[allow(dead_code)]
+    struct Conf {
+        #[doc = "foo\nbar"]
+        #[config(default = 1)]
+        a: u32,
+    }
+
+    assert_eq!(Conf::META.doc, &["Root", "doc"]);
+    assert_eq!(Conf::META.fields[0].doc, &["foo", "bar"]);
+
+    #[cfg(feature = "toml")]
+    {
+        let out = confique::toml::template::<Conf>(Default::default());
+        assert!(out.contains("#foo\n#bar\n"), "{out}");
+        assert!(!out.lines().any(|l| !l.is_empty() && !l.starts_with('#')), "{out}");
+    }
+}
