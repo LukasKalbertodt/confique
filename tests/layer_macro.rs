@@ -472,7 +472,7 @@ fn with_defaults() {
         http: { headers: [] },
     }).unwrap();
 
-    let conf = Conf::builder().preloaded(layer).load().unwrap();
+    let conf = Conf::builder().layer(layer).load().unwrap();
     assert_eq!(conf.name, "peter");
     assert_eq!(conf.port, 8080);
     assert_eq!(conf.http.bind, IpAddr::from([127, 0, 0, 1]));

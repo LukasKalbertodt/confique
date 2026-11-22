@@ -43,7 +43,7 @@ fn main() {
     let cli = Cli::parse();
 
     let r = Conf::builder()
-        .preloaded(cli.cli_config) // <--- Provide the preloaded layer to the builder
+        .layer(cli.cli_config) // <--- Provide the CLI layer to the builder
         .file(cli.config_file)
         .load();
 

@@ -320,7 +320,7 @@ pub use confique_macro::Config;
 /// The macro returns `Result<<C as Config>::Layer, Error>`. Fields that are not
 /// mentioned are `None`/empty, i.e. default values are *not* applied. To get
 /// your actual configuration, use the layer like any other, e.g. pass it to
-/// [`Builder::preloaded`], or combine it with other layers via
+/// [`Builder::layer`], or combine it with other layers via
 /// [`Layer::with_fallback`] and [`Layer::default_values`]. If you only need
 /// the default values as fallback, use [`config!`] instead.
 ///
@@ -551,7 +551,7 @@ pub trait Layer: for<'de> Deserialize<'de> {
     /// environment variables or default values), so you usually don't need
     /// to call this. It is useful for layers you construct manually (e.g. from
     /// command line arguments) before passing them to
-    /// [`Builder::preloaded`]. Struct validators are not run by this, as
+    /// [`Builder::layer`]. Struct validators are not run by this, as
     /// they require the complete configuration (see [`Config::from_layer`]).
     ///
     /// The default implementation does nothing and returns `Ok(())`.

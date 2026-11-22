@@ -41,8 +41,8 @@ impl<C: Config> Builder<C> {
     }
 
     /// Adds an already loaded configuration layer as source.
-    pub fn preloaded(mut self, layer: C::Layer) -> Self {
-        self.sources.push(Source::Preloaded(layer));
+    pub fn layer(mut self, layer: C::Layer) -> Self {
+        self.sources.push(Source::Layer(layer));
         self
     }
 
@@ -58,7 +58,7 @@ impl<C: Config> Builder<C> {
                 #[cfg(any(feature = "toml", feature = "yaml", feature = "json5"))]
                 Source::File(path) => File::new(path)?.load()?,
                 Source::Env => C::Layer::from_env()?,
-                Source::Preloaded(p) => p,
+                Source::Layer(p) => p,
             };
 
             partial = partial.with_fallback(layer);
@@ -72,5 +72,5 @@ enum Source<C: Config> {
     #[cfg(any(feature = "toml", feature = "yaml", feature = "json5"))]
     File(PathBuf),
     Env,
-    Preloaded(C::Layer),
+    Layer(C::Layer),
 }
