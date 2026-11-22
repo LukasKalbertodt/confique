@@ -73,6 +73,9 @@ pub(crate) fn get_array_item_type(ty: &syn::Type) -> Option<&syn::Type> {
             }
 
             match &args[0] {
+                // A slice as only generic argument means a pointer-like type,
+                // e.g. `Box<[T]>`, as `Vec<[T]>` and similar are invalid.
+                syn::GenericArgument::Type(syn::Type::Slice(slice)) => Some(&slice.elem),
                 syn::GenericArgument::Type(t) => Some(t),
                 _ => None,
             }

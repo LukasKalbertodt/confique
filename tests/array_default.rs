@@ -156,3 +156,20 @@ fn nested_empty() {
     ]));
     assert_eq!(def.all_empty_maps, vec![HashMap::new(), HashMap::from([("a".into(), vec![])])]);
 }
+
+#[test]
+fn boxed_slice() {
+    #[derive(Config)]
+    struct Foo {
+        // Out of `i32` range, so this only compiles if `u64` is inferred.
+        #[config(default = [1, 5_000_000_000])]
+        boxed: Box<[u64]>,
+
+        #[config(default = [[1, 2], [3, 4]])]
+        vec_of_arrays: Vec<[u8; 2]>,
+    }
+
+    let def = Foo::builder().load().unwrap();
+    assert_eq!(&*def.boxed, &[1, 5_000_000_000]);
+    assert_eq!(def.vec_of_arrays, vec![[1, 2], [3, 4]]);
+}
