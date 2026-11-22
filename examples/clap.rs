@@ -35,7 +35,7 @@ struct Cli {
     config_file: PathBuf,
 
     #[command(flatten)] // <--- include layer type here and flatten it
-    cli_config: <Conf as Config>::Layer,
+    cli_config: ConfLayer,
 }
 
 

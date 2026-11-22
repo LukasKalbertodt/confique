@@ -114,7 +114,8 @@
 //! ```
 //!
 //! But you can also assemble your configuration yourself. That's what
-//! the *layer* types are for (i.e. [`Config::Layer`]). These implement
+//! the *layer* types are for (i.e. [`Config::Layer`]), which the derive
+//! generates next to your struct as `{Name}Layer`. These implement
 //! `serde::Deserialize` and can thus be loaded from a vast number of sources.
 //! One of those sources is the built-in [`File`] which gives you a bit more
 //! control when loading configuration from files. And you can always simply
@@ -441,12 +442,11 @@ pub use confique_macro::config;
 pub trait Config: Sized {
     /// A layer of `Self` (a potentially partial configuration).
     ///
-    /// This type is supposed to have the exact same fields as this one, but
-    /// with every field being optional. Its main use is to have a layered
-    /// configuration from multiple sources where each layer might not contain
-    /// all required values. The only thing that matters is that combining all
-    /// layers will result in a configuration object that has all required
-    /// values defined.
+    /// This type has the exact same fields as `Self`, but with every field
+    /// being optional. Its main use is to have a layered configuration from
+    /// multiple sources where each layer might not contain all required
+    /// values. The only thing that matters is that combining all layers will
+    /// result in a configuration object that has all required values defined.
     type Layer: Layer;
 
     /// A description of this configuration.

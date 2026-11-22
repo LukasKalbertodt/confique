@@ -1,4 +1,4 @@
-//! This example demonstrate how you can add a builder-API to the partial type
+//! This example demonstrate how you can add a builder-API to the layer type
 //! by using `layer_attr` to derive `TypedBuilder`.
 
 use confique::Config;
@@ -15,7 +15,7 @@ struct Conf {
 }
 
 fn main() {
-    let layer = <Conf as Config>::Layer::builder()
+    let layer = ConfLayer::builder()
         .age(23)
         .build();
     let config = Conf::from_layer(layer);

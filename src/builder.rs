@@ -40,7 +40,7 @@ impl<C: Config> Builder<C> {
         self
     }
 
-    /// Adds an already loaded configuration layer as source.
+    /// Adds a layer as source.
     pub fn layer(mut self, layer: C::Layer) -> Self {
         self.sources.push(Source::Layer(layer));
         self
