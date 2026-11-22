@@ -121,7 +121,32 @@
 //! create an instance of the layer type in Rust code, either with struct
 //! initializer syntax or, more conveniently, with the [`layer!`] macro.
 //!
-//! Once you have all your layers collected, you have to combine
+//! If you just want to add such a layer to the usual sources (e.g. values from
+//! CLI arguments), pass it to [`Builder::layer`]:
+//!
+//! ```no_run
+//! # #[cfg(not(feature = "toml"))]
+//! # fn main() {}
+//! # #[cfg(feature = "toml")]
+//! # fn main() -> Result<(), confique::Error> {
+//! use confique::Config;
+//!
+//! #[derive(Config)]
+//! struct Conf {
+//!     foo: f32,
+//! }
+//!
+//! let cli_layer = ConfLayer { foo: Some(3.14) };
+//! let config = Conf::builder()
+//!     .layer(cli_layer)
+//!     .env()
+//!     .file("config.toml")
+//!     .load()?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! For full control, you can also merge layers yourself: combine
 //! them via [`Layer::with_fallback`] and convert them to the actual config
 //! type via [`Config::from_layer`]. And you probably also want to use
 //! [`Layer::default_values`] as the last layer.
@@ -141,10 +166,7 @@
 //! let from_file: ConfLayer = File::with_format("/etc/foo/config", FileFormat::Toml)
 //!     .required()
 //!     .load()?;
-//! let manual = ConfLayer {
-//!     // Remember: all fields in the layer types are `Option`s!
-//!     foo: Some(3.14),
-//! };
+//! let manual = ConfLayer { foo: Some(3.14) };
 //! let defaults = ConfLayer::default_values();
 //!
 //! let merged = from_file.with_fallback(manual).with_fallback(defaults);
