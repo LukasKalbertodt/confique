@@ -190,6 +190,7 @@ fn format_impl(out: &mut impl Formatter, meta: &Meta, options: &FormatOptions) {
             if let Some(env) = env.filter(|_| options.env_keys) {
                 empty_sep_doc_line!();
                 out.env_comment(env);
+                emitted_something = true;
             }
         }
 

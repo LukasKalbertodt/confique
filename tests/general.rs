@@ -365,3 +365,20 @@ fn multi_line_doc_strings() {
         assert!(!out.lines().any(|l| !l.is_empty() && !l.starts_with('#')), "{out}");
     }
 }
+
+#[test]
+#[cfg(feature = "toml")]
+fn template_env_without_docs() {
+    #[derive(Config)]
+    #[allow(dead_code)]
+    struct Conf {
+        #[config(env = "TEMPLATE_ENV_WITHOUT_DOCS", default = 3)]
+        a: u32,
+    }
+
+    let out = confique::toml::template::<Conf>(Default::default());
+    assert!(
+        out.contains("variable `TEMPLATE_ENV_WITHOUT_DOCS`.\n#\n# Default value: 3\n"),
+        "{out}",
+    );
+}
