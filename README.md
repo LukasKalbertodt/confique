@@ -14,13 +14,28 @@ Confique is a rather light-weight library that helps with configuration manageme
 - **Load config values from**:
     - Environment variables
     - Files: [TOML](https://toml.io/), [YAML](https://yaml.org/), and [JSON5](https://json5.org/)
+    - CLI arguments, e.g. by deriving `clap::Args` for the layer type ([example](https://github.com/LukasKalbertodt/confique/blob/main/examples/clap.rs))
     - Anything with a `serde` Deserializer
 - **Based on `serde`**: less code in `confique` (more light-weight) and access to a huge ecosystem of high quality parsers.
 - **Easily generate configuration "templates"**: describe all available config values to your users without repeating yourself.
 - **Simple validation**: validity checks can easily be added via attributes.
 
 
-## Simple example
+## Mini example
+
+```rust
+use confique::Config;
+
+#[derive(Config)]
+struct Conf {
+    #[config(env = "NAME", default = "Morgan Yu")]
+    name: String,
+}
+
+let config = Conf::builder().env().file("config.toml").load()?;
+```
+
+## A bigger example
 
 ```rust
 use std::{net::IpAddr, path::PathBuf};
