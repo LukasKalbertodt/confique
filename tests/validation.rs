@@ -601,8 +601,6 @@ fn struct_validation() {
     assert_err_contains(load("foo = 123\nbar=27"), "exactly one of foo and bar must be set");
 }
 
-// Defined outside of the test function, as `nested` fields referring to types
-// defined inside a function don't work with the derive.
 #[derive(Config)]
 #[allow(dead_code)]
 #[config(validate = Self::validate)]
