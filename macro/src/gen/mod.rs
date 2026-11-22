@@ -377,7 +377,7 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
                                 }
                             }
 
-                            <std::option::Option<__ConfiqueWrap>
+                            <Option<__ConfiqueWrap>
                                 as confique::serde::Deserialize>::deserialize(deserializer)
                                 .map(|o| o.map(|w| w.0))
                         }
@@ -416,7 +416,7 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
             // Code for `Layer::validate()`
             if has_validators {
                 parts.validate_exprs.push(quote! {
-                    if let std::option::Option::Some(v) = &self.#field_name {
+                    if let Option::Some(v) = &self.#field_name {
                         #validate_fn(v)?;
                     }
                 });
@@ -480,7 +480,7 @@ fn gen_deserialize_into_method(
     let method_name = deserialize_into_method_name(field_name);
     let mut value = quote! { #deserialize_fn(deserializer)? };
     if is_leaf {
-        value = quote! { std::option::Option::Some(#value) };
+        value = quote! { Option::Some(#value) };
     }
 
     quote! {

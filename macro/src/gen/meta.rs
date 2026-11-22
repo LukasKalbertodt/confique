@@ -10,8 +10,8 @@ use crate::ir::{self, Expr, FieldKind, FloatType, IntType, LeafKind, MapKey};
 pub(super) fn gen(input: &ir::Input) -> TokenStream {
     fn env_tokens(env: &Option<String>) -> TokenStream {
         match env {
-            Some(key) => quote! { std::option::Option::Some(#key) },
-            None => quote! { std::option::Option::None },
+            Some(key) => quote! { Option::Some(#key) },
+            None => quote! { Option::None },
         }
     }
 
@@ -40,9 +40,9 @@ pub(super) fn gen(input: &ir::Input) -> TokenStream {
                 let default_value = match default {
                     Some(default) => {
                         let meta = default_value_to_meta_expr(default);
-                        quote! { std::option::Option::Some(#meta) }
+                        quote! { Option::Some(#meta) }
                     },
-                    None => quote! { std::option::Option::None },
+                    None => quote! { Option::None },
                 };
                 quote! {
                     confique::meta::FieldKind::Leaf {
