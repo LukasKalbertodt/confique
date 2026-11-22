@@ -98,6 +98,7 @@ impl File {
 /// All file formats supported by confique.
 ///
 /// All enum variants are `#[cfg]` guarded with the respective crate feature.
+#[non_exhaustive]
 pub enum FileFormat {
     #[cfg(feature = "toml")]
     Toml,
