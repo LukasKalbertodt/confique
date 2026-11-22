@@ -143,6 +143,7 @@ impl Field {
             let conflicting_attrs = [
                 ("default", attrs.default.is_some()),
                 ("env", attrs.env.is_some()),
+                ("parse_env", attrs.parse_env.is_some()),
                 ("deserialize_with", attrs.deserialize_with.is_some()),
                 ("validate", !attrs.validate.is_empty()),
             ];
