@@ -523,7 +523,8 @@ fn parse_env() {
     std::env::set_var("PE_FUN", "1,2");
     assert_eq!(
         Layer::from_env().unwrap_err().to_string(),
-        "validation failed for 'function': list too short",
+        "failed to deserialize value `Conf::function` from environment variable `PE_FUN`: \
+            validation failed for 'function': list too short",
     );
     std::env::set_var("PE_FUN", "1,2,3");
     assert_eq!(Layer::from_env().unwrap(), Layer {

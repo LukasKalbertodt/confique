@@ -117,7 +117,11 @@ pub fn from_env_with_parser<T, E: std::error::Error + Send + Sync + 'static>(
             match validate(&v) {
                 Ok(()) => Ok(Some(v)),
                 Err(_) if is_empty => Ok(None),
-                Err(e) => Err(e),
+                Err(e) => Err(ErrorInner::EnvDeserialization {
+                    key: key.into(),
+                    field: field.into(),
+                    msg: e.to_string(),
+                }.into()),
             }
         },
         Err(_) if is_empty => Ok(None),
