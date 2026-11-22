@@ -35,19 +35,23 @@ So it won't work if you rename symbols or use full paths.
   the (unqualified) symbol `Option` must be in scope and refer to
   `std::option::Option`.
 
-## Generated layer type
+# Generated code
 
-The derive generates a layer type next to your struct, named `{Name}Layer` by
-default (see [`layer_name`](crate::_derive::layer_name)) and with the same
-visibility as your struct. Apart from implementing [`Layer`](crate::Layer), it
-has two associated functions for each leaf field:
+The derive generates the following things:
+- A [`Config`](crate::Config) impl for your struct
+- A layer type next to your struct, named `{Name}Layer` by default 
+  (see [`layer_name`](crate::_derive::layer_name)) and with the same
+  visibility as your struct.
+  - Implements [`Layer`](crate::Layer) for that layer type
+  - Adds associated functions to the layer type, for each leaf field:
+    - `validate_{field}`: runs all [validators](crate::_derive::validate) of that
+      field on a given value (a no-op if there are none).
+    - `deserialize_{field}`: deserializes a value for that field like confique
+      does when loading a layer, i.e. using
+      [`deserialize_with`](crate::_derive::deserialize_with) and running
+      [validators](crate::_derive::validate).
 
-- `deserialize_{field}`: deserializes a value for that field like confique
-  does when loading a layer, i.e. using
-  [`deserialize_with`](crate::_derive::deserialize_with) and running
-  [validators](crate::_derive::validate).
-- `validate_{field}`: runs all [validators](crate::_derive::validate) of that
-  field on a given value (a no-op if there are none).
+Again, to see this in action, look at [`_example`](crate::_example).
 
 
 # Attributes
