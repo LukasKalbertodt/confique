@@ -249,9 +249,10 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
             let validate_fn_name = quote::format_ident!("validate_{unraw_field_name}");
             let deserialize_fn_name = quote::format_ident!("deserialize_{unraw_field_name}");
 
-            // The public `validate_{field}` method, if there are any validators.
-            // `validate_fn` is `Some(path)` to that method.
-            let validate_fn = if validate.len() > 0 {
+            // The public `validate_{field}` method, generated for every leaf
+            // field. Without validators, it's a no-op.
+            let has_validators = !validate.is_empty();
+            {
                 let validate_inner = validate.iter().map(|validator| match validator {
                     ir::FieldValidator::Fn(f) => quote_spanned! {f.span() =>
                         confique::internal::validate_field(v, &#f, #path)?;
@@ -270,13 +271,21 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
                     },
                 }).collect::<TokenStream>();
 
-                let doc = format!(
-                    "Runs all validators of the field `{unraw_field_name}` (specified via \
-                        `#[config(validate = ...)]`) on the given value.",
-                );
+                let (doc, validate_inner) = if has_validators {
+                    let doc = format!(
+                        "Runs all validators of the field `{unraw_field_name}` (specified via \
+                            `#[config(validate = ...)]`) on the given value.",
+                    );
+                    (doc, validate_inner)
+                } else {
+                    let doc = format!(
+                        "No-op that always returns `Ok(())`, as the field \
+                            `{unraw_field_name}` has no validators.",
+                    );
+                    (doc, quote! { let _ = v; })
+                };
                 parts.layer_methods.extend(quote! {
                     #[doc = #doc]
-                    #[inline(never)]
                     #visibility fn #validate_fn_name(
                         v: &#inner_ty,
                     ) -> std::result::Result<(), confique::Error> {
@@ -284,20 +293,17 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
                         std::result::Result::Ok(())
                     }
                 });
-
-                Some(quote! { #layer_struct_name::#validate_fn_name })
-            } else {
-                None
-            };
+            }
+            let validate_fn = quote! { #layer_struct_name::#validate_fn_name };
 
             // The public `deserialize_{field}` method.
             let deser_fn = match deserialize_with {
                 Some(f) => quote! { #f },
                 None => quote! { <#inner_ty as confique::serde::Deserialize>::deserialize },
             };
-            let body = match &validate_fn {
-                None => quote! { #deser_fn(deserializer) },
-                Some(validate_fn) => quote! {
+            let body = match has_validators {
+                false => quote! { #deser_fn(deserializer) },
+                true => quote! {
                     let out = #deser_fn(deserializer)?;
                     #validate_fn(&out).map_err(<D::Error as confique::serde::de::Error>::custom)?;
                     std::result::Result::Ok(out)
@@ -312,12 +318,12 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
                     ),
                     None => "`serde::Deserialize::deserialize`".into(),
                 };
-                let action = match &validate_fn {
-                    Some(_) => format!(
+                let action = match has_validators {
+                    true => format!(
                         "calls {deser_desc} and then validates the value via \
                             [`Self::{validate_fn_name}`]",
                     ),
-                    None => format!("simply calls {deser_desc}"),
+                    false => format!("simply calls {deser_desc}"),
                 };
 
                 format!(
@@ -343,7 +349,7 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
             parts.struct_fields.push({
                 // If there is a custom deserializer or a validator, we need to
                 // set the serde `deserialize_with` attribute.
-                let attr = if deserialize_with.is_some() || validate.len() > 0 {
+                let attr = if deserialize_with.is_some() || has_validators {
                     // Since the struct field is `Option<T>`, we need to create
                     // another wrapper deserialization function, that always
                     // returns `Some`.
@@ -392,7 +398,7 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
             }
 
             // Code for `Layer::validate()`
-            if let Some(validate_fn) = &validate_fn {
+            if has_validators {
                 parts.validate_exprs.push(quote! {
                     if let std::option::Option::Some(v) = &self.#field_name {
                         #validate_fn(v)?;
@@ -426,18 +432,10 @@ fn gen_parts_for_field(f: &ir::Field, input: &ir::Input, parts: &mut Parts) {
                 (Some(key), None) => quote! {
                     confique::internal::from_env(#key, #qualified_name, #deserialize_fn)?
                 },
-                (Some(key), Some(parse_env)) => {
-                    let validator = match &validate_fn {
-                        Some(f) => quote! { #f },
-                        None => quote! {
-                            |_| std::result::Result::<(), confique::Error>::Ok(())
-                        },
-                    };
-                    quote! {
-                        confique::internal::from_env_with_parser(
-                            #key, #qualified_name, #parse_env, #validator)?
-                    }
-                }
+                (Some(key), Some(parse_env)) => quote! {
+                    confique::internal::from_env_with_parser(
+                        #key, #qualified_name, #parse_env, #validate_fn)?
+                },
             });
         }
     }

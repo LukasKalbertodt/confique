@@ -86,11 +86,11 @@ struct Conf {
 }
 ```
 
-For each field with at least one `validate` attribute, the layer type gets
-an associated function `validate_{field}(v: &T) -> Result<(), Error>` that
-runs all validators of that field. This is useful if you construct layers
-manually instead of deserializing them, as validators are then not run
-automatically.
+For each leaf field, the layer type gets an associated function
+`validate_{field}(v: &T) -> Result<(), Error>` that runs all validators of
+that field (a no-op for fields without validators). This is useful if you
+construct layers manually instead of deserializing them, as validators are
+then not run automatically.
 
 
 # On the struct
